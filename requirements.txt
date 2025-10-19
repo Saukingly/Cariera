@@ -37,4 +37,4 @@ twilio
 # Azure Face API
 azure-cognitiveservices-vision-face
 
-azure-ai-vision-imageanalysis==1.0.0b2 # 
+azure-ai-vision-imageanalysis

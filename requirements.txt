@@ -38,3 +38,6 @@ twilio
 azure-cognitiveservices-vision-face
 
 azure-ai-vision-imageanalysis
+
+python-dotenv
+mysqlclient

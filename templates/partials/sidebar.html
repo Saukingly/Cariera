@@ -20,53 +20,88 @@
 .navbar-nav::-webkit-scrollbar {
     display: none;
 }
+
 .navbar-nav .nav-link {
     padding: 0.9rem 1rem !important;
     white-space: nowrap;
-    font-size: 0.95rem !important;  /* Slightly bigger */
-    font-weight: 500;              /* Neater look */
+    font-size: 0.95rem !important;
+    font-weight: 600;
     display: flex;
     align-items: center;
-    border-radius: 6px;
-    transition: all 0.2s ease;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    color: #ffffff !important;  /* White text by default */
+    margin: 0 4px;
 }
 
 .navbar-nav .nav-link i {
-    margin-right: 6px;
-    font-size: 16px; /* Bigger icons */
-    width: 18px;
+    margin-right: 8px;
+    font-size: 18px;
+    width: 20px;
     text-align: center;
+    color: #ffffff !important;  /* White icons by default */
+    filter: brightness(1.3);
 }
 
 .navbar-nav .nav-link span {
-    font-size: 0.9rem;  /* Bigger text */
-    font-weight: 500;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #ffffff !important;  /* White text by default */
 }
 
 .menu-title {
-    margin: 0 0.75rem 0 0.5rem !important;
+    margin: 0 0.75rem 0.5rem 0.5rem !important;
     padding: 0 !important;
+    background: none !important;  /* Remove background */
+    border: none !important;      /* Remove border */
+    border-radius: 0 !important;
 }
 
 .menu-title span {
-    font-size: 0.8rem !important;  /* Slightly larger */
-    font-weight: 600;
+    font-size: 0.75rem !important;
+    font-weight: 700;
     text-transform: uppercase;
-    color: #8b949e;
+    color: #ffffff !important;  /* White for section titles */
     white-space: nowrap;
+    letter-spacing: 1.5px;
+    opacity: 0.9;
 }
 
 .navbar-nav .nav-link:hover {
-    background-color: rgba(255, 255, 255, 0.1);
-    transform: translateY(-1px);
+    background: linear-gradient(135deg, rgba(0, 212, 255, 0.2), rgba(147, 112, 219, 0.2));
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 212, 255, 0.4);
+}
+
+.navbar-nav .nav-link:hover i {
+    color: #00d4ff !important;  /* Bright cyan on hover */
+    transform: scale(1.15);
+    filter: brightness(1.5) drop-shadow(0 0 8px rgba(0, 212, 255, 0.6));
+}
+
+.navbar-nav .nav-link:hover span {
+    color: #ffffff !important;
+}
+
+/* Active state */
+.navbar-nav .nav-link.active {
+    background: linear-gradient(135deg, rgba(0, 212, 255, 0.25), rgba(147, 112, 219, 0.25));
+    color: #ffffff !important;
+    box-shadow: 0 4px 16px rgba(0, 212, 255, 0.4);
+}
+
+.navbar-nav .nav-link.active i {
+    color: #00d4ff !important;
+    filter: brightness(1.5);
 }
 
 /* External link indicator */
 .navbar-nav .nav-link[target="_blank"]::after {
     content: "↗";
-    margin-left: 4px;
-    font-size: 0.65rem;
-    opacity: 0.7;
+    margin-left: 5px;
+    font-size: 0.7rem;
+    opacity: 0.8;
+    color: #00d4ff;
 }
 
 /* Mobile responsive - stack items better */
@@ -133,7 +168,7 @@
 
                 <!-- My Cariera Section -->
                 <li class="menu-title">
-                    <span data-key="t-menu">My Cariera</span>
+                    <span data-key="t-menu">MY CARIERA</span>
                 </li>
 
                 <li class="nav-item">
@@ -166,7 +201,7 @@
 
                 <!-- Tools Section -->
                 <li class="menu-title">
-                    <span data-key="t-tools">Tools</span>
+                    <span data-key="t-tools">TOOLS</span>
                 </li>
 
                 <li class="nav-item">
@@ -193,8 +228,7 @@
 
                 <!-- Account Section -->
                 <li class="menu-title">
-                    <i class="ri-more-fill"></i>
-                    <span data-key="t-account">Account</span>
+                    <span data-key="t-account">ACCOUNT</span>
                 </li>
 
                 <li class="nav-item">

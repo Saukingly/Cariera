@@ -45,9 +45,6 @@ AZURE_FACE_API_KEY = os.getenv("AZURE_FACE_API_KEY")
 AZURE_VISION_ENDPOINT = os.getenv("AZURE_VISION_ENDPOINT")
 AZURE_VISION_KEY = os.getenv("AZURE_VISION_KEY")
 
-
-
-
 # ==============================================================================
 
 # Application definition
@@ -124,18 +121,32 @@ CRISPY_TEMPLATE_PACK = "bootstrap5"
 WSGI_APPLICATION = 'velzon.wsgi.application'
 
 # ==============================================================================
-# CHANNELS / ASGI CONFIGURATION
+# CHANNELS / ASGI CONFIGURATION (LOCAL DEVELOPMENT WITH REDIS)
 # ==============================================================================
 ASGI_APPLICATION = 'velzon.asgi.application'
 
-# For LOCAL DEVELOPMENT - No Redis needed
+# --- Option 1: Default for Local Development (No Redis Needed) ---
+# CHANNEL_LAYERS = {
+#     "default": {
+#         "BACKEND": "channels.layers.InMemoryChannelLayer"
+#     },
+# }
+
+# --- Option 2: ACTIVE FOR TESTING with a Local Redis Server ---
+# This is now the active configuration.
+# Using database 1 for Channels.
 CHANNEL_LAYERS = {
     "default": {
-        "BACKEND": "channels.layers.InMemoryChannelLayer"
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("127.0.0.1", 6379)],
+        },
     },
 }
 
-# Database Configuration (Local Development)
+# ==============================================================================
+# DATABASE CONFIGURATION (LOCAL DEVELOPMENT)
+# ==============================================================================
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
@@ -151,13 +162,30 @@ DATABASES = {
     }
 }
 
-# Cache Configuration (Local Development)
+# ==============================================================================
+# CACHE CONFIGURATION (LOCAL DEVELOPMENT WITH REDIS)
+# ==============================================================================
+# --- Option 1: Default for Local Development (No Redis Needed) ---
+# CACHES = {
+#     'default': {
+#         'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+#         'LOCATION': 'unique-snowflake',
+#     }
+# }
+
+# --- Option 2: ACTIVE FOR TESTING with a Local Redis Server ---
+# This is now the active configuration.
+# Using database 0 for caching, which is separate from Channels.
 CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'unique-snowflake',
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": "redis://127.0.0.1:6379/0",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
     }
 }
+
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -215,7 +243,6 @@ LOGGING = {
         'apps': {
             'handlers': ['console'],
             'level': 'INFO', # Changed to INFO for cleaner production logs, can be set to DEBUG for development
-            # --- THE FIX: Change propagate from True to False ---
             'propagate': False, 
         },
     },

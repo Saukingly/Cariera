@@ -506,6 +506,7 @@ def submit_personality_test_answer(request):
 
 
 @login_required
+@require_POST
 def calculate_personality_test_result(request):
     user_answers = UserPersonalityTestAnswer.objects.filter(user=request.user).select_related('choice')
     if not user_answers.exists():

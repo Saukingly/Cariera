@@ -44,20 +44,55 @@ DATABASES = {
     }
 }
 
-# Replace the CACHES section with this simple in-memory cache:
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'unique-snowflake',
-    }
-}
+# ==============================================================================
+# PRODUCTION CACHE & CHANNELS CONFIGURATION (AZURE REDIS)
+# ==============================================================================
+# IMPORTANT: Set REDIS_PASSWORD in your Azure App Service Configuration
+REDIS_PASSWORD = os.environ.get('REDIS_PASSWORD')
+REDIS_HOST = 'redicach3.redis.cache.windows.net'
+REDIS_PORT = 6380  # SSL port for Azure Redis
 
-# Replace CHANNEL_LAYERS with in-memory layer (for development only):
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels.layers.InMemoryChannelLayer"
-    },
-}
+if REDIS_PASSWORD:
+    # --- PRODUCTION CACHE ---
+    # Using database 0 for caching
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": f"rediss://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/0",
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+                "CONNECTION_POOL_KWARGS": {
+                    "ssl_cert_reqs": None,  # Disables client-side cert validation
+                },
+            },
+        }
+    }
+
+    # --- PRODUCTION CHANNELS ---
+    # Using database 1 for Channels to keep it separate from the cache
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {
+                "hosts": [(f"rediss://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/1")],
+            },
+        },
+    }
+    print("[Startup] Redis configured for Caching and Channels.")
+else:
+    print("[Startup] WARNING: REDIS_PASSWORD not set. Falling back to in-memory cache and channels.")
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'unique-snowflake',
+        }
+    }
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels.layers.InMemoryChannelLayer"
+        },
+    }
+
 # Static files for production
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'

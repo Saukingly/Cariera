@@ -1,2 +1,2 @@
-jevonlyons10@gmail.com
-jevikin12
+username: jevonlyons10@gmail.com
+password: jevikin12

@@ -1,1 +1,1 @@
-https://cariera-web-hjbdegdca3a8f2az.westus3-01.azurewebsites.net/apps/journeys/
+https://app-service-od-fnfkg9bvaef8b9ag.westus-01.azurewebsites.net/apps/interviews/result/8b4a9205-d928-4722-beca-48b94e583cf8/?

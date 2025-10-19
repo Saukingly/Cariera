@@ -31,7 +31,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': os.environ.get('AZURE_MYSQL_NAME', 'careercoach'),
+        'NAME': os.environ.get('AZURE_MYSQL_NAME', 'careercoach1'),
         'USER': os.environ.get('AZURE_MYSQL_USER'),
         'PASSWORD': os.environ.get('AZURE_MYSQL_PASSWORD'),
         'HOST': os.environ.get('AZURE_MYSQL_HOST'),

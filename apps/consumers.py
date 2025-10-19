@@ -3,6 +3,7 @@ import logging
 import asyncio
 from datetime import datetime
 from channels.generic.websocket import AsyncWebsocketConsumer
+from channels.db import database_sync_to_async
 from django.conf import settings
 from openai import AzureOpenAI
 from .models import InterviewSession, InterviewTurn, UserProfile, InterviewResult, InterviewAnalysisPoint
@@ -14,21 +15,34 @@ class InterviewConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.session_id = self.scope['url_route']['kwargs']['session_id']
         self.user = self.scope["user"]
+        
+        logger.info(f"[WebSocket] Connection attempt:")
+        logger.info(f"  - Session ID: {self.session_id}")
+        logger.info(f"  - User: {self.user}")
+        logger.info(f"  - Authenticated: {self.user.is_authenticated}")
+        logger.info(f"  - Path: {self.scope.get('path')}")
+        
         if not self.user.is_authenticated:
-            await self.close(); return
+            logger.warning(f"[WebSocket] REJECTED - User not authenticated")
+            await self.close()
+            return
         
         try:
             self.session = await self.get_interview_session(self.session_id)
-        except InterviewSession.DoesNotExist:
-            await self.close(); return
+            logger.info(f"[WebSocket] Session found: {self.session.id}")
+        except Exception as e:
+            logger.error(f"[WebSocket] Session lookup failed: {e}")
+            await self.close()
+            return
         
         await self.channel_layer.group_add(f'interview_{self.session_id}', self.channel_name)
         await self.accept()
-        logger.info(f"[InterviewConsumer] WebSocket connected for session {self.session_id}")
+        logger.info(f"[WebSocket] ✅ CONNECTION ACCEPTED for session {self.session_id}")
+        
         await self.send_ai_message("Hello! I'm your AI interviewer from Cariera. I'm here to help you practice. When you're ready, please tell me a bit about yourself to begin.")
 
     async def disconnect(self, close_code):
-        logger.info(f"[InterviewConsumer] WebSocket disconnected for session {self.session_id}. Triggering analysis.")
+        logger.info(f"[WebSocket] Disconnected for session {self.session_id}. Triggering analysis.")
         asyncio.create_task(self.analyze_and_save_results())
         await self.channel_layer.group_discard(f'interview_{self.session_id}', self.channel_name)
 
@@ -55,7 +69,11 @@ class InterviewConsumer(AsyncWebsocketConsumer):
                 f"Ask one question at a time. {personality_context}"
             )
             
-            client = AzureOpenAI(azure_endpoint=settings.AZURE_OPENAI_AGENT_ENDPOINT, api_key=settings.AZURE_OPENAI_AGENT_KEY, api_version="2024-02-01")
+            client = AzureOpenAI(
+                azure_endpoint=settings.AZURE_OPENAI_AGENT_ENDPOINT,
+                api_key=settings.AZURE_OPENAI_AGENT_KEY,
+                api_version="2024-02-01"
+            )
             
             conversation_history = [{"role": "system", "content": system_prompt}]
             turns = await self.get_interview_turns()
@@ -86,15 +104,19 @@ class InterviewConsumer(AsyncWebsocketConsumer):
             if not turns or len(turns) < 2:
                 logger.warning(f"[Analysis] Session {self.session_id} has too few turns. Creating a default result.")
                 await self.create_interview_result({
-                    'overall_score': 0, 'confidence_score': 0, 'clarity_score': 0,
+                    'overall_score': 0,
+                    'confidence_score': 0,
+                    'clarity_score': 0,
                     'feedback_summary': "This interview session was too short to generate a meaningful analysis. Please try again and complete at least one full exchange with the AI interviewer."
                 }, 0)
                 return
 
             transcript = "\n".join([f"{turn.speaker.upper()}: {turn.text}" for turn in turns])
             analysis_points = await self.get_analysis_points()
+            
             presence_summary = "Camera analysis was not enabled for this session."
             camera_presence_score = 0
+            
             if analysis_points:
                 total_points = len(analysis_points)
                 presence_count = sum(1 for point in analysis_points if point.person_detected)
@@ -120,7 +142,7 @@ class InterviewConsumer(AsyncWebsocketConsumer):
                 "- Gently point out 1-2 areas for improvement.\n"
                 "- End with an encouraging statement.\n\n"
                 f"CONTEXT FOR THIS ANALYSIS:\n"
-                f"- User's On-Camera Engagement Score was: {presence_summary}/100. Incorporate this into your assessment of their confidence."
+                f"- User's On-Camera Engagement Score was: {camera_presence_score}/100. Incorporate this into your assessment of their confidence."
             )
             
             user_prompt = f"Analyze this transcript:\n\n{transcript}"
@@ -130,30 +152,32 @@ class InterviewConsumer(AsyncWebsocketConsumer):
                 api_key=settings.AZURE_OPENAI_AGENT_KEY,
                 api_version="2024-02-01"
             )
+            
             response = client.chat.completions.create(
                 model=settings.AZURE_OPENAI_AGENT_DEPLOYMENT_NAME,
-                messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
                 temperature=0.5,
                 response_format={"type": "json_object"}
             )
-            analysis_json = json.loads(response.choices[0].message.content)
             
-            # --- FIX: Pass the correct variable name ---
+            analysis_json = json.loads(response.choices[0].message.content)
             await self.create_interview_result(analysis_json, camera_presence_score)
             logger.info(f"[Analysis] Successfully saved analysis for session {self.session_id}")
 
-        # --- FIX: Correct indentation for the except block ---
         except Exception as e:
             logger.error(f"[Analysis] Failed for session {self.session_id}: {e}", exc_info=True)
             await self.create_interview_result({
-                'overall_score': 0, 'confidence_score': 0, 'clarity_score': 0,
+                'overall_score': 0,
+                'confidence_score': 0,
+                'clarity_score': 0,
                 'feedback_summary': "An unexpected error occurred while analyzing your interview. Please try again."
             }, 0)
 
     async def send_ai_message(self, message):
         await self.send(text_data=json.dumps({'type': 'ai_response', 'message': message}))
-
-    from channels.db import database_sync_to_async
 
     @database_sync_to_async
     def get_interview_session(self, session_id):
@@ -161,10 +185,10 @@ class InterviewConsumer(AsyncWebsocketConsumer):
         
     @database_sync_to_async
     def update_session_status_completed(self):
-        session, _ = InterviewSession.objects.update_or_create(
-            id=self.session_id,
-            defaults={'status': 'completed', 'end_time': datetime.now()}
-        )
+        session = InterviewSession.objects.get(id=self.session_id)
+        session.status = 'completed'
+        session.end_time = datetime.now()
+        session.save()
         self.session = session
 
     @database_sync_to_async

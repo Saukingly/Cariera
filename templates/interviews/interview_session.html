@@ -18,11 +18,10 @@
         border: 2px solid var(--vz-border-color);
         margin: 0 auto 1rem;
         display: none;
-        transition: box-shadow 0.3s ease-in-out; /* For the glow effect */
+        transition: box-shadow 0.3s ease-in-out;
     }
     #user-video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
 
-    /* NEW: Animation for the camera capture "glow" */
     @keyframes capture-glow {
         0% { box-shadow: 0 0 0 0px rgba(0, 123, 255, 0.7); }
         50% { box-shadow: 0 0 10px 3px rgba(0, 123, 255, 0.7); }
@@ -86,13 +85,27 @@
 {% endblock content %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr/npm/microsoft-cognitiveservices-speech-sdk@latest/distrib/browser/microsoft.cognitiveservices.speech.sdk.bundle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@latest/distrib/browser/microsoft.cognitiveservices.speech.sdk.bundle.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", function () {
+    // ✅ CRITICAL FIX: Safety check at the very top
+    const micButton = document.getElementById('mic-button');
+    const statusIndicator = document.getElementById('status-indicator');
+    
+    if (!micButton || !statusIndicator) {
+        console.log("Not on interview page, skipping initialization");
+        return; // Exit early to prevent errors on other pages
+    }
+
     const sessionId = "{{ session.id }}";
     const speechKey = "{{ azure_speech_key }}";
     const speechRegion = "{{ azure_speech_region }}";
     const interviewDurationSeconds = {{ session.duration_minutes }} * 60;
+
+    console.log("🎙️ Speech Config:", { 
+        key: speechKey ? "✅ Set" : "❌ Missing", 
+        region: speechRegion || "❌ Missing" 
+    });
 
     let speechRecognizer;
     let synthesizer;
@@ -102,8 +115,6 @@ document.addEventListener("DOMContentLoaded", function () {
     let frameCaptureInterval;
     let interviewEnded = false;
 
-    const statusIndicator = document.getElementById('status-indicator');
-    const micButton = document.getElementById('mic-button');
     const transcriptBox = document.getElementById('transcript-box');
     const timerDisplay = document.getElementById('timer');
     const endInterviewBtn = document.getElementById('end-interview-btn');
@@ -117,7 +128,7 @@ document.addEventListener("DOMContentLoaded", function () {
     endInterviewBtn.addEventListener('click', endInterview);
     cameraSwitch.addEventListener('change', handleCameraToggle);
 
-    initializeWebSocket(sessionId); // Pass sessionId to the function
+    initializeWebSocket(sessionId);
     if (typeof SpeechSDK !== 'undefined') {
         initializeSpeechSDK();
     } else {
@@ -152,28 +163,64 @@ document.addEventListener("DOMContentLoaded", function () {
         }, 'image/jpeg');
     }
 
+    // ✅ FIXED: Better error handling for speech synthesis
     function speakText(text) {
         if (interviewEnded) return;
         updateStatus("AI is speaking...", "warning");
         if(micButton) micButton.disabled = true;
 
-        const speechConfig = SpeechSDK.SpeechConfig.fromSubscription(speechKey, speechRegion);
-        const localSynthesizer = new SpeechSDK.SpeechSynthesizer(speechConfig);
-
-        localSynthesizer.speakTextAsync(text, result => {
-            if (interviewEnded) { localSynthesizer.close(); return; }
-            if (result.reason === SpeechSDK.ResultReason.SynthesizingAudioCompleted) {
+        // Validate speech service configuration
+        if (!speechKey || !speechRegion) {
+            console.error("❌ Speech service not configured!");
+            updateStatus("Audio unavailable. Check console.", "danger");
+            addTranscriptEntry("AI (Text)", text);
+            setTimeout(() => {
                 updateStatus("Your turn. Click the mic to speak.", "primary");
                 if(micButton) micButton.disabled = false;
-            } else {
-                console.error("Speech synthesis failed:", result.errorDetails);
-                updateStatus("Error: Could not play AI audio.", "danger");
-            }
-            localSynthesizer.close();
-        }, error => {
-            console.error("Speech synthesis error:", error);
-            localSynthesizer.close();
-        });
+            }, 2000);
+            return;
+        }
+
+        try {
+            const speechConfig = SpeechSDK.SpeechConfig.fromSubscription(speechKey, speechRegion);
+            speechConfig.speechSynthesisVoiceName = "en-US-JennyNeural"; // Optional: Better voice
+            const localSynthesizer = new SpeechSDK.SpeechSynthesizer(speechConfig);
+
+            localSynthesizer.speakTextAsync(
+                text, 
+                result => {
+                    if (interviewEnded) { 
+                        localSynthesizer.close(); 
+                        return; 
+                    }
+                    
+                    if (result.reason === SpeechSDK.ResultReason.SynthesizingAudioCompleted) {
+                        console.log("✅ Speech synthesis completed");
+                        updateStatus("Your turn. Click the mic to speak.", "primary");
+                        if(micButton) micButton.disabled = false;
+                    } else if (result.reason === SpeechSDK.ResultReason.Canceled) {
+                        console.error("❌ Speech canceled:", result.errorDetails);
+                        updateStatus("Audio error. See console.", "danger");
+                        if(micButton) micButton.disabled = false;
+                    } else {
+                        console.error("❌ Speech failed:", result.errorDetails);
+                        updateStatus("Error: Could not play AI audio.", "danger");
+                        if(micButton) micButton.disabled = false;
+                    }
+                    localSynthesizer.close();
+                }, 
+                error => {
+                    console.error("❌ Speech synthesis error:", error);
+                    updateStatus("Audio playback failed.", "danger");
+                    if(micButton) micButton.disabled = false;
+                    localSynthesizer.close();
+                }
+            );
+        } catch (error) {
+            console.error("❌ Failed to initialize speech:", error);
+            updateStatus("Audio service error.", "danger");
+            if(micButton) micButton.disabled = false;
+        }
     }
 
     function endInterview() {
@@ -211,7 +258,11 @@ document.addEventListener("DOMContentLoaded", function () {
                 userVideo.srcObject = stream;
                 videoContainer.style.display = 'block';
                 frameCaptureInterval = setInterval(captureAndAnalyzeFrame, 10000);
-            } catch (err) { console.error("Error accessing camera:", err); alert("Could not access your camera."); this.checked = false; }
+            } catch (err) { 
+                console.error("Error accessing camera:", err); 
+                alert("Could not access your camera."); 
+                this.checked = false; 
+            }
         } else {
             if (userVideo.srcObject) userVideo.srcObject.getTracks().forEach(track => track.stop());
             videoContainer.style.display = 'none';
@@ -219,15 +270,10 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
     
-    // ==========================================================================
-    // ==                          THE FINAL FIX                               ==
-    // ==========================================================================
+    // ✅ FIXED: WebSocket with better error handling
     function initializeWebSocket(sessionId) {
         const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
         const host = window.location.host;
-
-        // --- THIS IS THE CORRECTED URL ---
-        // It now includes the '/apps' prefix to match our project-level routing.
         const wsUrl = `${protocol}://${host}/apps/ws/interview/${sessionId}/`;
         
         console.log(`[WebSocket] Connecting to: ${wsUrl}`);
@@ -235,13 +281,15 @@ document.addEventListener("DOMContentLoaded", function () {
         interviewSocket = new WebSocket(wsUrl);
 
         interviewSocket.onopen = () => {
-            console.log("[WebSocket] Connection established.");
+            console.log("✅ [WebSocket] Connection established.");
             updateStatus("Waiting for AI to start...", "info");
-            connectionLostAlert.classList.add('d-none'); // Hide alert on successful connection
+            connectionLostAlert.classList.add('d-none');
         };
 
         interviewSocket.onmessage = (e) => {
             const data = JSON.parse(e.data);
+            console.log("[WebSocket] Message received:", data);
+            
             if (data.type === 'ai_response' && !interviewEnded) {
                 isWaitingForAI = false;
                 addTranscriptEntry("AI", data.message);
@@ -249,24 +297,22 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         };
         
-        interviewSocket.onclose = () => { 
+        interviewSocket.onclose = (event) => { 
+            console.log(`[WebSocket] Closed. Code: ${event.code}, Reason: ${event.reason}`);
             if (!interviewEnded) { 
-                console.error("[WebSocket] Connection closed unexpectedly.");
+                console.error("❌ [WebSocket] Connection closed unexpectedly.");
                 updateStatus("Connection lost.", "danger");
-                connectionLostAlert.classList.remove('d-none'); // Show alert
+                connectionLostAlert.classList.remove('d-none');
                 if(micButton) micButton.disabled = true; 
             } 
         };
 
         interviewSocket.onerror = (error) => {
-            console.error(`[WebSocket] Error: ${error.message}`);
+            console.error("❌ [WebSocket] Error:", error);
             updateStatus("A connection error occurred.", "danger");
-            connectionLostAlert.classList.remove('d-none'); // Show alert
+            connectionLostAlert.classList.remove('d-none');
         };
     }
-    // ==========================================================================
-    // ==========================================================================
-
 
     function initializeSpeechSDK() {
         const speechConfig = SpeechSDK.SpeechConfig.fromSubscription(speechKey, speechRegion);
@@ -274,11 +320,13 @@ document.addEventListener("DOMContentLoaded", function () {
         speechConfig.setProperty(SpeechSDK.PropertyId.SpeechServiceResponse_EndSilenceTimeoutMs, "2500");
         const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
         speechRecognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
+        
         speechRecognizer.recognized = (s, e) => {
             if (e.result.reason === SpeechSDK.ResultReason.RecognizedSpeech) {
                 const userText = e.result.text;
                 if (userText.trim() && !isWaitingForAI && !interviewEnded) {
-                    isWaitingForAI = true; addTranscriptEntry("You", userText);
+                    isWaitingForAI = true; 
+                    addTranscriptEntry("You", userText);
                     interviewSocket.send(JSON.stringify({ type: 'user_speech', message: userText }));
                     stopListening();
                 }
@@ -287,12 +335,58 @@ document.addEventListener("DOMContentLoaded", function () {
         speechRecognizer.canceled = (s, e) => { isWaitingForAI = false; stopListening(); };
         speechRecognizer.sessionStopped = (s, e) => stopListening();
     }
-    function startListening() { if (speechRecognizer && !interviewEnded) { updateStatus("Listening...", "success"); micButton.innerHTML = `<i class="ri-mic-fill fs-2"></i>`; micButton.classList.replace('btn-primary', 'btn-danger'); speechRecognizer.startContinuousRecognitionAsync(); } }
-    function stopListening() { if (speechRecognizer && !interviewEnded) { updateStatus("Processing...", "info"); micButton.innerHTML = `<i class="ri-mic-off-fill fs-2"></i>`; micButton.classList.replace('btn-danger', 'btn-primary'); micButton.disabled = true; speechRecognizer.stopContinuousRecognitionAsync(); } }
-    function toggleMicrophone() { if (micButton.classList.contains('btn-danger')) stopListening(); else startListening(); }
-    function updateStatus(message, type) { statusIndicator.textContent = message; statusIndicator.className = `status-indicator alert alert-${type}`; }
-    function addTranscriptEntry(speaker, text) { const entry = document.createElement('div'); entry.classList.add('transcript-entry'); entry.innerHTML = `<p class="mb-1"><span class="transcript-speaker ${speaker.toLowerCase()}"><strong>${speaker}:</strong></span></p><p class="text-muted ps-2">${text}</p>`; transcriptBox.appendChild(entry); transcriptBox.scrollTop = transcriptBox.scrollHeight; }
-    function startTimer() { let seconds = 0; timerInterval = setInterval(() => { if (interviewEnded) { clearInterval(timerInterval); return; } seconds++; const mins = String(Math.floor(seconds / 60)).padStart(2, '0'); const secs = String(seconds % 60).padStart(2, '0'); timerDisplay.textContent = `${mins}:${secs}`; if (seconds >= interviewDurationSeconds) endInterview(); }, 1000); }
+
+    function startListening() { 
+        if (speechRecognizer && !interviewEnded) { 
+            updateStatus("Listening...", "success"); 
+            micButton.innerHTML = `<i class="ri-mic-fill fs-2"></i>`; 
+            micButton.classList.replace('btn-primary', 'btn-danger'); 
+            speechRecognizer.startContinuousRecognitionAsync(); 
+        } 
+    }
+    
+    function stopListening() { 
+        if (speechRecognizer && !interviewEnded) { 
+            updateStatus("Processing...", "info"); 
+            micButton.innerHTML = `<i class="ri-mic-off-fill fs-2"></i>`; 
+            micButton.classList.replace('btn-danger', 'btn-primary'); 
+            micButton.disabled = true; 
+            speechRecognizer.stopContinuousRecognitionAsync(); 
+        } 
+    }
+    
+    function toggleMicrophone() { 
+        if (micButton.classList.contains('btn-danger')) stopListening(); 
+        else startListening(); 
+    }
+    
+    function updateStatus(message, type) { 
+        statusIndicator.textContent = message; 
+        statusIndicator.className = `status-indicator alert alert-${type}`; 
+    }
+    
+    function addTranscriptEntry(speaker, text) { 
+        const entry = document.createElement('div'); 
+        entry.classList.add('transcript-entry'); 
+        entry.innerHTML = `<p class="mb-1"><span class="transcript-speaker ${speaker.toLowerCase()}"><strong>${speaker}:</strong></span></p><p class="text-muted ps-2">${text}</p>`; 
+        transcriptBox.appendChild(entry); 
+        transcriptBox.scrollTop = transcriptBox.scrollHeight; 
+    }
+    
+    function startTimer() { 
+        let seconds = 0; 
+        timerInterval = setInterval(() => { 
+            if (interviewEnded) { 
+                clearInterval(timerInterval); 
+                return; 
+            } 
+            seconds++; 
+            const mins = String(Math.floor(seconds / 60)).padStart(2, '0'); 
+            const secs = String(seconds % 60).padStart(2, '0'); 
+            timerDisplay.textContent = `${mins}:${secs}`; 
+            if (seconds >= interviewDurationSeconds) endInterview(); 
+        }, 1000); 
+    }
 });
 </script>
 {% endblock extra_js %}

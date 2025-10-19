@@ -3,14 +3,13 @@
 from .settings import *
 import os
 from pathlib import Path
-import platform
 
 # Security settings for production
 DEBUG = False
 SECRET_KEY = os.environ.get('SECRET_KEY')
 
 # ==============================================================================
-# CRITICAL FIX: Ensure your Azure hostname is in ALLOWED_HOSTS
+# AZURE HOSTNAME CONFIGURATION
 # ==============================================================================
 AZURE_HOSTNAME = os.environ.get('WEBSITE_HOSTNAME')
 ALLOWED_HOSTS = []
@@ -18,10 +17,10 @@ if AZURE_HOSTNAME:
     ALLOWED_HOSTS.append(AZURE_HOSTNAME)
 
 print(f"[Startup] Allowed hosts configured: {ALLOWED_HOSTS}")
+
 # ==============================================================================
-
-
 # CSRF and Security
+# ==============================================================================
 CSRF_TRUSTED_ORIGINS = [
     f"https://{AZURE_HOSTNAME}"
 ] if AZURE_HOSTNAME else []
@@ -36,7 +35,9 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 # Base directory
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Azure MySQL Flexible Server Configuration (secure)
+# ==============================================================================
+# AZURE MYSQL CONFIGURATION
+# ==============================================================================
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
@@ -53,7 +54,9 @@ DATABASES = {
     }
 }
 
+# ==============================================================================
 # PRODUCTION CACHE & CHANNELS CONFIGURATION (AZURE REDIS)
+# ==============================================================================
 REDIS_PASSWORD = os.environ.get('REDIS_PASSWORD')
 REDIS_HOST = 'redicach3.redis.cache.windows.net'
 REDIS_PORT = 6380
@@ -69,11 +72,16 @@ if REDIS_PASSWORD:
             },
         }
     }
+    
+    # ✅ FIXED: Proper Redis URL format for Channels on Azure
     CHANNEL_LAYERS = {
         "default": {
             "BACKEND": "channels_redis.core.RedisChannelLayer",
             "CONFIG": {
-                "hosts": [(f"rediss://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/1")],
+                "hosts": [{
+                    "address": f"rediss://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/1",
+                    "ssl_cert_reqs": None,
+                }],
             },
         },
     }
@@ -86,3 +94,13 @@ else:
 # Static files for production
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+
+# ==============================================================================
+# AZURE APP SERVICES WEBSOCKET CONFIGURATION
+# ==============================================================================
+# Azure App Services uses a different approach for WebSockets
+# These settings ensure proper WebSocket handling
+USE_X_FORWARDED_HOST = True
+USE_X_FORWARDED_PORT = True
+
+print("[Startup] Production settings loaded for Azure App Services")

@@ -1,6 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Count, Q, Prefetch
@@ -8,6 +8,7 @@ from django.db import transaction
 from django.contrib import messages
 from django.conf import settings
 from twilio.rest import Client
+from twilio.base.exceptions import TwilioRestException
 import json
 import random
 from collections import Counter
@@ -16,7 +17,6 @@ import re
 import math
 import os
 import requests
-import re
 from .models import InterviewSession, InterviewResult
 
 from .forms import WhatsAppSubscribeForm
@@ -26,10 +26,10 @@ from .management.commands.send_whatsapp_digest import send_digest_to_user
 
 from io import BytesIO
 
-from .forms import WhatsAppSubscribeForm
-from .models import UserProfile
-# Import the reusable function from your management command
-from .management.commands.send_whatsapp_digest import send_digest_to_user
+from django.http import JsonResponse
+from django.core.cache import cache
+from channels.layers import get_channel_layer
+import asyncio
 
 # Azure SDK Imports
 from django.conf import settings
@@ -55,7 +55,6 @@ from .models import (
     InterviewSession, InterviewTurn, InterviewResult, InterviewAnalysisPoint
 )
 from .forms import UserUpdateForm, ProfileUpdateForm, WhatsAppSubscribeForm
-from .management.commands.send_whatsapp_digest import send_digest_to_user
 
 logger = logging.getLogger(__name__)
 
@@ -505,25 +504,39 @@ def submit_personality_test_answer(request):
         return JsonResponse({'status': 'error', 'message': 'Invalid data provided.'}, status=400)
 
 
+# ==============================================================================
+# ==                            THE FIX IS HERE                               ==
+# ==============================================================================
 @login_required
-@require_POST
 def calculate_personality_test_result(request):
-    user_answers = UserPersonalityTestAnswer.objects.filter(user=request.user).select_related('choice')
-    if not user_answers.exists():
-        return JsonResponse({'status': 'error', 'message': 'No answers found.'}, status=400)
-    scores = Counter(answer.choice.personality_code for answer in user_answers)
-    top_three = scores.most_common(3)
-    result_code = "".join([item[0] for item in top_three])
-    profile, created = UserProfile.objects.get_or_create(user=request.user)
-    profile.personality_type = result_code
-    profile.save()
-    logger.info(f"[PersonalityTest] Calculated result for user {request.user.id}: {result_code}")
-    descriptions = {'R': 'Realistic (Doers)', 'I': 'Investigative (Thinkers)', 'A': 'Artistic (Creators)',
-                    'S': 'Social (Helpers)', 'E': 'Enterprising (Persuaders)', 'C': 'Conventional (Organizers)'}
-    primary_type_code = top_three[0][0]
-    primary_type_name = descriptions.get(primary_type_code, "Unknown")
-    return JsonResponse({'status': 'success', 'result_code': result_code, 'primary_type': primary_type_name,
-                         'full_scores': dict(scores)})
+    # This view now handles both POST (correct) and GET (failsafe) requests.
+    if request.method == 'POST':
+        user_answers = UserPersonalityTestAnswer.objects.filter(user=request.user).select_related('choice')
+        if not user_answers.exists():
+            return JsonResponse({'status': 'error', 'message': 'No answers found.'}, status=400)
+        
+        scores = Counter(answer.choice.personality_code for answer in user_answers)
+        top_three = scores.most_common(3)
+        result_code = "".join([item[0] for item in top_three])
+        
+        profile, created = UserProfile.objects.get_or_create(user=request.user)
+        profile.personality_type = result_code
+        profile.save()
+        
+        logger.info(f"[PersonalityTest] Calculated result for user {request.user.id}: {result_code}")
+        
+        descriptions = {'R': 'Realistic (Doers)', 'I': 'Investigative (Thinkers)', 'A': 'Artistic (Creators)',
+                        'S': 'Social (Helpers)', 'E': 'Enterprising (Persuaders)', 'C': 'Conventional (Organizers)'}
+        primary_type_code = top_three[0][0]
+        primary_type_name = descriptions.get(primary_type_code, "Unknown")
+        
+        return JsonResponse({'status': 'success', 'result_code': result_code, 'primary_type': primary_type_name,
+                             'full_scores': dict(scores)})
+    
+    # If the request is a GET, it's likely an accident from the JS. Redirect gracefully.
+    logger.warning(f"[PersonalityTest] Received unexpected GET request for calculate_result. Redirecting to profile.")
+    messages.info(request, 'Your personality assessment results can be found on your profile.')
+    return redirect('apps:profile')
 
 
 @login_required
@@ -1370,12 +1383,6 @@ def analyze_interview_frame_view(request):
         logger.error(f"[AnalyzeFrame] Error for user {request.user.username} on session {session_id}: {e}", exc_info=True)
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
-@login_required
-def ats_resume_tools_view(request):
-    # This view is correct.
-    user_action_plans = ActionPlan.objects.filter(user=request.user).select_related('career')
-    context = {'action_plans': user_action_plans}
-    return render(request, 'tools/ats_resume_tools.html', context)
 
 @login_required
 def whatsapp_subscribe_view(request):
@@ -1449,3 +1456,60 @@ def whatsapp_subscribe_view(request):
 @csrf_exempt
 def whatsapp_webhook(request):
     return HttpResponse("")
+
+
+def test_redis(request):
+    """
+    Test Redis connection for both cache and channels.
+    Access this at: /apps/test-redis/
+    """
+    results = {
+        'status': 'Testing Redis connections...',
+        'cache': {},
+        'channels': {}
+    }
+    
+    # Test 1: Cache
+    try:
+        test_key = 'test_redis_key'
+        test_value = 'Hello from Redis Cache!'
+        
+        cache.set(test_key, test_value, 10)
+        retrieved_value = cache.get(test_key)
+        
+        results['cache']['status'] = 'SUCCESS' if retrieved_value == test_value else 'FAILED'
+        results['cache']['test_value_set'] = test_value
+        results['cache']['test_value_retrieved'] = retrieved_value
+        results['cache']['match'] = retrieved_value == test_value
+    except Exception as e:
+        results['cache']['status'] = 'ERROR'
+        results['cache']['error'] = str(e)
+    
+    # Test 2: Channel Layer
+    try:
+        channel_layer = get_channel_layer()
+        results['channels']['configured'] = channel_layer is not None
+        results['channels']['backend'] = str(type(channel_layer).__name__)
+        
+        if channel_layer:
+            results['channels']['status'] = 'SUCCESS'
+        else:
+            results['channels']['status'] = 'NOT CONFIGURED'
+    except Exception as e:
+        results['channels']['status'] = 'ERROR'
+        results['channels']['error'] = str(e)
+    
+    # Overall status
+    cache_ok = results['cache'].get('status') == 'SUCCESS'
+    channels_ok = results['channels'].get('status') == 'SUCCESS'
+    
+    if cache_ok and channels_ok:
+        results['overall_status'] = '✅ All Redis connections working!'
+    elif cache_ok:
+        results['overall_status'] = '⚠️ Cache OK, but Channels has issues'
+    elif channels_ok:
+        results['overall_status'] = '⚠️ Channels OK, but Cache has issues'
+    else:
+        results['overall_status'] = '❌ Both Redis connections failed'
+    
+    return JsonResponse(results, json_dumps_params={'indent': 2})

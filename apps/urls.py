@@ -1,4 +1,5 @@
 from django.urls import path
+from . import views  # ← ADD THIS LINE
 from .views import (
     # Journey & Folder Views
     journeys_list_view, create_journey_view, delete_journey_view,
@@ -39,19 +40,16 @@ from .views import (
     interview_progress_view,
     interview_retry_view,
 
-
     ats_resume_tools_view,
     get_resume_keywords_view,
     optimize_resume_text_view,
 
     analyze_interview_frame_view,
 
-    
     whatsapp_subscribe_view,
     whatsapp_webhook,
 
-
-
+    test_redis,  # ← ADD THIS TO THE IMPORT LIST
 )
 
 app_name = "apps"
@@ -103,12 +101,8 @@ urlpatterns = [
     path("interviews/session/<uuid:session_id>/", view=interview_session_view, name="interview.session"),
     path("interviews/result/<uuid:session_id>/", view=interview_result_view, name="interview.result"),
     path("interviews/delete/<uuid:session_id>/", view=interview_delete_view, name="interview.delete"),
-    # <-- New URL for deleting
     path("interviews/progress/", view=interview_progress_view, name="interview.progress"),
-    # <-- New URL for progress chart
     path("interviews/retry/<uuid:session_id>/", view=interview_retry_view, name="interview.retry"),
-
-  
 
     path("ats-resume-tools/", view=ats_resume_tools_view, name="ats_resume_tools"),
     # API Endpoints for the tools page
@@ -117,9 +111,9 @@ urlpatterns = [
 
     path("api/analyze-frame/", view=analyze_interview_frame_view, name="api.analyze_frame"),
 
-
-
     path("whatsapp/subscribe/", view=whatsapp_subscribe_view, name="whatsapp.subscribe"),
     path("webhooks/whatsapp/", view=whatsapp_webhook, name="whatsapp.webhook"),
 
+    # Test Redis endpoint
+    path('test-redis/', view=test_redis, name='test_redis'),  # ← FIXED: Use 'view=' parameter
 ]

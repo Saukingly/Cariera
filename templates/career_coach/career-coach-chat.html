@@ -5,98 +5,353 @@
 
 {% block extra_css %}
 <style>
-    /* --- MASTER LAYOUT FIX FOR STICKY FOOTER/INPUT --- */
-    /* This forces the main content area to behave as a flex container, filling the viewport's height */
+    /* --- MASTER LAYOUT & FONT SIZE --- */
     .main-content {
         display: flex !important;
         flex-direction: column !important;
-        /* Adjust for topbar height (default: 70px) */
-        min-height: calc(100vh - 70px);
-        max-height: calc(100vh - 70px);
-        padding-bottom: 0 !important; /* Prevents double padding with footer */
-        overflow: hidden; /* Prevent the main content from scrolling */
+        height: 100vh;
+        padding-bottom: 0 !important;
+        min-height: 0;
     }
 
-    /* These rules ensure all parent containers of the chat can grow and shrink as needed */
-    .page-content, .container-fluid, .chat-row, .chat-row > .col-12 {
-        flex-grow: 1;
+    .page-content {
+        flex: 1 1 auto;
         display: flex;
         flex-direction: column;
-        min-height: 0; /* CRITICAL: Allows flex items to shrink, preventing overflow */
+        min-height: 0;
+        padding-top: 24px !important;
         padding-bottom: 0 !important;
-        overflow: hidden; /* Prevent these containers from scrolling */
     }
-    .page-content { padding-top: 24px !important; }
 
-    /* The main chat container: fills all available space and acts as the anchor for the input */
+    .container-fluid, .chat-row, .chat-row > .col-12 {
+        flex: 1 1 auto;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        padding: 0 !important;
+    }
+
+    .chat-conversation-container {
+        --chat-font-size: 14px;
+        flex: 1 1 auto;
+        overflow-y: auto;
+        padding: 1.5rem;
+        scroll-behavior: smooth;
+        min-height: 0;
+    }
+
+    /* --- CHAT CONTAINER & BUBBLES --- */
     .ai-chat-container {
-        position: relative; /* CRITICAL: For positioning the absolute input section */
-        flex-grow: 1;
+        flex: 1 1 auto;
         display: flex;
         flex-direction: column;
         border: 1px solid var(--vz-border-color);
         border-radius: var(--vz-card-border-radius);
-        margin-bottom: 24px; /* Space above the page footer */
-        min-height: 0; /* Allow shrinking */
-        overflow: hidden; /* Prevent overflow */
+        margin: 0 24px 0 24px; /* Removed bottom margin */
+        overflow: hidden;
+        min-height: 0;
+        height: calc(100vh - 120px); /* Adjusted height */
     }
 
-    /* The message list container: it scrolls, while its parent does not */
-    .chat-conversation-container {
-        flex-grow: 1;
-        overflow-y: auto; /* This is the element that gets the scrollbar */
-        padding: 1.5rem;
-        padding-bottom: 120px; /* Increased space for the input bar - adjust as needed */
-        min-height: 0; /* Allow shrinking */
+    .chat-list {
+        display: flex;
+        width: 100%;
+        margin-bottom: 20px;
+        animation: messageFadeIn 0.4s ease-out forwards;
+        opacity: 0;
+        transform: translateY(20px);
     }
 
-    /* The input section: taken out of the normal flow and fixed to the bottom of its parent */
+    @keyframes messageFadeIn {
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .chat-list.right {
+        justify-content: flex-end;
+    }
+
+    .conversation-list {
+        max-width: 85%;
+        display: flex;
+        align-items: flex-start;
+    }
+
+    .ctext-wrap-content {
+        font-size: var(--chat-font-size);
+        transition: font-size 0.2s ease;
+        padding: 0.75rem 1rem;
+        box-shadow: var(--vz-box-shadow-sm) !important;
+        display: inline-block;
+        text-align: left;
+        word-break: break-word;
+    }
+
+    .chat-list.left .ctext-wrap-content {
+        background: var(--vz-light) !important;
+        border-radius: 0.5rem 1.25rem 1.25rem 1.25rem;
+    }
+
+    .chat-list.right .ctext-wrap-content {
+        background-color: var(--vz-primary) !important;
+        color: #fff !important;
+        border-radius: 1.25rem 0.5rem 1.25rem 1.25rem;
+    }
+
+    /* --- SMART FLOATING INPUT SECTION --- */
     .chat-input-section {
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        right: 0;
+        flex-shrink: 0;
         background-color: var(--vz-tertiary-bg);
         border-top: 1px solid var(--vz-border-color);
         z-index: 10;
-        flex-shrink: 0; /* Prevent the input from shrinking */
+        padding: 1rem;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
     }
 
-    /* When empty, the welcome header is centered vertically */
-    .chat-conversation-list:has(.chat-welcome-header) {
-        height: 100%;
+    .chat-input-section.is-floating {
+        position: fixed;
+        bottom: 0;
+        left: 50%;
+        width: calc(100% - var(--vz-vertical-nav-width) - 48px);
+        max-width: 1100px;
+        transform: translateX(-50%);
+        border-radius: 8px 8px 0 0;
+        border-top: 1px solid var(--vz-border-color);
+        box-shadow: 0 -5px 20px rgba(0,0,0,0.08);
+        z-index: 1000;
+    }
+
+    .ai-chat-container.has-floating-input .chat-conversation-container {
+        padding-bottom: 85px;
+    }
+
+    @media (max-width: 768px) {
+        .chat-input-section.is-floating {
+            left: 0;
+            width: 100%;
+            max-width: none;
+            transform: translateX(0);
+            border-radius: 0;
+        }
+    }
+
+    /* --- SUBTLE SCROLL NAVIGATION ARROWS - MOVED DOWN --- */
+    .scroll-navigation {
+        position: fixed;
+        right: 50px;
+        top: 60%; /* Moved down from 50% */
+        transform: translateY(-50%);
         display: flex;
         flex-direction: column;
-        justify-content: center;
-        min-height: calc(100% - 120px); /* Account for input height */
+        gap: 8px;
+        z-index: 1001;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
     }
 
-    /* --- CHAT BUBBLE & WELCOME STYLES --- */
-    .chat-welcome-header { text-align: center; }
-    .chat-welcome-avatar { width: 70px; height: 70px; background: linear-gradient(45deg, var(--vz-primary), var(--vz-success)); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem auto; box-shadow: 0 0 25px rgba(var(--vz-primary-rgb), 0.3); }
-    .chat-welcome-avatar i { font-size: 2.5rem; color: #fff; }
-    .chat-list { display: flex; margin-bottom: 20px; }
-    .chat-list.right { justify-content: flex-end; }
-    .conversation-list { max-width: 80%; display: flex; align-items: flex-start; }
-    .ctext-wrap-content { padding: 0.75rem 1rem; box-shadow: var(--vz-box-shadow-sm) !important; display: inline-block; text-align: left; word-break: break-word; }
-    .chat-list.left .ctext-wrap-content { background: var(--vz-light) !important; border-radius: 0.5rem 1.25rem 1.25rem 1.25rem; }
-    .chat-list.right .ctext-wrap-content { background-color: var(--vz-primary) !important; color: #fff !important; border-radius: 1.25rem 0.5rem 1.25rem 1.25rem; }
-    .markdown-content p { margin-bottom: 0; }
-    .chat-list.right .markdown-content p, .chat-list.right .markdown-content li, .chat-list.right .markdown-content code { color: white !important; }
+    .scroll-navigation.is-visible {
+        opacity: 1;
+        pointer-events: auto;
+    }
 
-    /* --- MODAL STYLES (Both Modals) --- */
-    .modal-content { background-color: #2c3e50; color: #ecf0f1; border-radius: 15px; }
-    .modal-header { border-bottom: 1px solid #34495e; }
-    .modal-header .btn-close { filter: invert(1); }
-    #personalityResultModal .result-code-badge { font-size: 1.25rem; padding: 0.5em 0.75em; }
-    #personalityResultModal .result-description { font-size: 1.5rem; color: #1abc9c; font-weight: 500; }
+    .scroll-arrow {
+        width: 36px;
+        height: 36px;
+        background-color: var(--vz-card-bg);
+        color: var(--vz-body-color);
+        border: 1px solid var(--vz-border-color);
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        font-size: 16px;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        transition: all 0.2s ease;
+        opacity: 0.7;
+    }
 
-    /* Test-specific styles */
-    .progress-bar-container { width: 100%; background-color: #34495e; border-radius: 10px; margin-bottom: 2rem; }
-    #testProgressBar { height: 15px; background: linear-gradient(90deg, #1abc9c, #3498db); width: 0%; border-radius: 10px; transition: width 0.5s ease-in-out; text-align: center; color: white; font-weight: bold; }
-    #testQuestionText { font-size: 1.5rem; margin-bottom: 2rem; text-align: center; }
-    .choice-btn { display: block; width: 100%; margin: 0 auto 1rem auto; max-width: 500px; padding: 1rem; background-color: #34495e; border: 2px solid transparent; border-radius: 8px; transition: all 0.3s ease; }
-    .choice-btn:hover { background-color: #4a627a; border-color: #1abc9c; }
+    .scroll-arrow:hover {
+        opacity: 1;
+        transform: scale(1.05);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .scroll-arrow.disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+        pointer-events: none;
+    }
+
+    /* --- NEW: DISCREET DOCK CHAT BUBBLE --- */
+    .dock-chat-btn-bubble {
+        position: fixed;
+        bottom: 25px;
+        left: 25px;
+        width: 45px;
+        height: 45px;
+        background-color: var(--vz-card-bg);
+        color: var(--vz-body-color);
+        border: 1px solid var(--vz-border-color);
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        font-size: 1.5rem;
+        cursor: pointer;
+        z-index: 1001;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        opacity: 0;
+        transform: scale(0.8);
+        pointer-events: none;
+        transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+
+    .dock-chat-btn-bubble.is-visible {
+        opacity: 1;
+        transform: scale(1);
+        pointer-events: auto;
+    }
+
+    /* --- FLOATING FONT SIZE CONTROLS (NEW POSITIONING) --- */
+    .floating-font-controls {
+        position: fixed;
+        bottom: 100px; /* Above the settings button area */
+        right: 25px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        z-index: 1002;
+        opacity: 0.8;
+        transition: opacity 0.3s ease;
+    }
+
+    .floating-font-controls:hover {
+        opacity: 1;
+    }
+
+    .floating-font-controls .btn {
+        width: 40px;
+        height: 40px;
+        padding: 0;
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 1;
+        text-align: center;
+        border-radius: 50%;
+        background-color: var(--vz-card-bg);
+        color: var(--vz-body-color);
+        border: 1px solid var(--vz-border-color);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        transition: all 0.2s ease;
+        cursor: pointer;
+    }
+
+    .floating-font-controls .btn:hover {
+        transform: scale(1.05);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    .floating-font-controls .btn:active {
+        transform: scale(0.95);
+    }
+
+    /* Hide the original font controls in header */
+    .page-title-right .font-size-controls {
+        display: none;
+    }
+
+    /* --- LONG MESSAGE & SCROLL BUTTON --- */
+    .ctext-wrap {
+        position: relative;
+    }
+
+    .ctext-wrap-content.is-collapsible {
+        max-height: 250px;
+        overflow: hidden;
+        transition: max-height 0.4s ease-in-out;
+    }
+
+    .read-less-btn {
+        margin-top: 8px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--vz-primary);
+        cursor: pointer;
+    }
+
+    .chat-list.right .read-less-btn {
+        color: #fff;
+        opacity: 0.8;
+    }
+
+    /* --- HIDE FOOTER --- */
+    .main-content > .footer,
+    .main-content > footer {
+        display: none !important;
+    }
+
+    /* Ensure proper layout */
+    body {
+        overflow-x: hidden;
+    }
+
+    /* Mobile adjustments for floating font controls */
+    @media (max-width: 768px) {
+        .floating-font-controls {
+            bottom: 80px;
+            right: 15px;
+        }
+
+        .floating-font-controls .btn {
+            width: 36px;
+            height: 36px;
+            font-size: 12px;
+        }
+    }
+    
+    /* --- SPEECH INPUT STYLES --- */
+    #mic-btn.is-recording {
+        color: var(--vz-danger) !important;
+        background-color: var(--vz-danger-bg-subtle) !important;
+        animation: pulse-ring 1.25s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+    }
+
+    #mic-status {
+        font-size: 11px;
+        color: var(--vz-body-color);
+        min-width: 80px;
+        text-align: center;
+        transition: color 0.3s ease;
+    }
+
+    @keyframes pulse-ring {
+      0% {
+        box-shadow: 0 0 0 0 rgba(240, 101, 72, 0.7);
+      }
+      70% {
+        box-shadow: 0 0 0 10px rgba(240, 101, 72, 0);
+      }
+      100% {
+        box-shadow: 0 0 0 0 rgba(240, 101, 72, 0);
+      }
+    }
+    
+    .choice-btn {
+        display: block;
+        width: 100%;
+        margin-bottom: 10px;
+        text-align: left;
+        padding: 12px 18px;
+        background-color: var(--vz-light);
+        border: 1px solid var(--vz-border-color);
+    }
+    
+    .progress-bar-container {
+        margin-bottom: 2rem;
+    }
+
 </style>
 {% endblock extra_css %}
 
@@ -107,9 +362,13 @@
             <!-- Page Title -->
             <div class="row">
                 <div class="col-12">
-                    <div class="page-title-box d-sm-flex align-items-center justify-content-between">
+                    <div class="page-title-box d-sm-flex align-items-center justify-content-between px-3">
                         <h4 class="mb-sm-0">{{ active_journey.title }}</h4>
-                        <div class="page-title-right">
+                        <div class="page-title-right d-flex align-items-center gap-3">
+                            <div class="font-size-controls" title="Adjust chat font size">
+                                <button id="font-decrease" class="btn btn-soft-secondary btn-sm">A-</button>
+                                <button id="font-increase" class="btn btn-soft-secondary btn-sm">A+</button>
+                            </div>
                             <ol class="breadcrumb m-0">
                                 <li class="breadcrumb-item"><a href="{% url 'apps:journeys.list' %}">My Journeys</a></li>
                                 <li class="breadcrumb-item active">Chat</li>
@@ -123,11 +382,10 @@
             <div class="row chat-row">
                 <div class="col-12">
                     <div class="ai-chat-container">
-                        <div class="chat-conversation-container" data-simplebar>
+                        <div class="chat-conversation-container">
                             <ul class="list-unstyled chat-conversation-list" id="conversation-list">
                                 {% if not chat_messages %}
                                 <li class="chat-welcome-header">
-                                    <div class="chat-welcome-avatar"><i class="ri-compass-3-line"></i></div>
                                     <h5>Your Career Begins</h5>
                                     <p class="text-muted mb-0">What's the first step on your journey?</p>
                                 </li>
@@ -135,7 +393,7 @@
                                 {% for msg in chat_messages %}
                                 <li class="chat-list {% if msg.sender_type == 'user' %}right{% else %}left{% endif %}">
                                     <div class="conversation-list">
-                                        {% if msg.sender_type == 'ai' %}<div class="chat-avatar me-3"><img src="{% static 'images/logo-sm.png'%}" class="rounded-circle avatar-xs" alt=""></div>{% endif %}
+                                        {% if msg.sender_type == 'ai' %}<div class="chat-avatar me-3"><img src="{% static 'images/logo-sm.gif'%}" class="rounded-circle avatar-md" alt=""></div>{% endif %}
                                         <div class="user-chat-content">
                                             <div class="ctext-wrap"><div class="ctext-wrap-content markdown-content">{{ msg.message|safe }}</div></div>
                                             <div class="conversation-name mt-1"><span class="name text-muted fs-11">{% if msg.sender_type == 'user' %}You{% else %}AI Coach{% endif %}</span> <span class="time text-muted fs-11">{{ msg.timestamp|time:"h:i A" }}</span></div>
@@ -145,7 +403,7 @@
                                 {% endfor %}
                             </ul>
                         </div>
-                        <div class="chat-input-section p-3">
+                        <div class="chat-input-section" id="chat-input-section">
                             <form id="chat-form">
                                 <div class="row g-2 align-items-center">
                                     <div class="col-auto">
@@ -153,9 +411,15 @@
                                             <i class="ri-psychotherapy-line align-bottom"></i>
                                         </button>
                                     </div>
-                                    <div class="col"><input type="text" class="form-control chat-input" id="chat-input" placeholder="Start your conversation..." autocomplete="off"></div>
+                                    <div class="col"><input type="text" class="form-control chat-input" id="chat-input" placeholder="Start your conversation or use the mic..." autocomplete="off"></div>
+                                    <div class="col-auto">
+                                        <button type="button" class="btn btn-soft-secondary" id="mic-btn" data-bs-toggle="tooltip" data-bs-placement="top" title="Use Microphone">
+                                            <i class="ri-mic-line align-bottom fs-16"></i>
+                                        </button>
+                                    </div>
                                     <div class="col-auto"><button type="submit" class="btn btn-success chat-send"><i class="ri-send-plane-2-fill align-bottom"></i></button></div>
                                 </div>
+                                <div id="mic-status" class="text-center mt-1" style="height: 14px;"></div>
                             </form>
                         </div>
                     </div>
@@ -163,10 +427,33 @@
             </div>
         </div>
     </div>
-    {% include "partials/footer.html" %}
 </div>
 
-<!-- MODAL 1: Shows existing personality result -->
+<!-- FLOATING ACTION BUTTONS -->
+<div class="scroll-navigation" id="scroll-navigation">
+    <div class="scroll-arrow" id="scroll-to-prev" title="Previous message">
+        <i class="ri-arrow-up-s-line"></i>
+    </div>
+    <div class="scroll-arrow" id="scroll-to-next" title="Next message">
+        <i class="ri-arrow-down-s-line"></i>
+    </div>
+</div>
+
+<div class="dock-chat-btn-bubble" id="dock-chat-btn" title="Scroll to Chat Input">
+    <i class="ri-anchor-line"></i>
+</div>
+
+<!-- NEW: FLOATING FONT SIZE CONTROLS -->
+<div class="floating-font-controls" id="floating-font-controls">
+    <button id="floating-font-increase" class="btn" title="Increase font size">
+        A+
+    </button>
+    <button id="floating-font-decrease" class="btn" title="Decrease font size">
+        A-
+    </button>
+</div>
+
+<!-- MODALS -->
 <div class="modal fade" id="personalityResultModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content text-center p-4">
@@ -187,15 +474,13 @@
     </div>
 </div>
 
-
-<!-- MODAL 2: The actual personality test questions -->
 <div class="modal fade" id="personalityTestModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content">
             <div class="modal-header"><h5 class="modal-title">Career Personality Assessment</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body p-4">
                 <div id="test-loading-view" class="text-center"><div class="spinner-border text-light" role="status"></div><p class="mt-2">Loading...</p></div>
-                <div id="test-question-view" style="display: none;"><div class="progress-bar-container"><div id="testProgressBar" role="progressbar"></div></div><h3 id="testQuestionText"></h3><div id="testChoicesContainer" class="mt-4"></div></div>
+                <div id="test-question-view" style="display: none;"><div class="progress-bar-container"><div class="progress"><div id="testProgressBar" class="progress-bar" role="progressbar"></div></div></div><h3 id="testQuestionText" class="my-4"></h3><div id="testChoicesContainer" class="mt-4"></div></div>
                 <div id="test-result-view" style="display: none; text-align: center;"><h2 class="mt-3">Assessment Complete!</h2><p>Your results have been saved.</p><button class="btn btn-success mt-3" data-bs-dismiss="modal">Close</button></div>
             </div>
         </div>
@@ -203,19 +488,16 @@
 </div>
 {% endblock content %}
 
-
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/showdown@2.1.0/dist/showdown.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@latest/distrib/browser/microsoft.cognitiveservices.speech.sdk.bundle.js"></script>
+
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    // --- STATE & CONFIG ---
+    // --- STATE, CONFIG, & URLS ---
     let userPersonalityType = "{{ user.profile.personality_type|default:'' }}";
-    const HOLLAND_CODES = {
-        'R': 'Realistic (Doers)', 'I': 'Investigative (Thinkers)', 'A': 'Artistic (Creators)',
-        'S': 'Social (Helpers)', 'E': 'Enterprising (Persuaders)', 'C': 'Conventional (Organizers)'
-    };
-
-    // --- API URLS ---
+    const HOLLAND_CODES = { 'R': 'Realistic', 'I': 'Investigative', 'A': 'Artistic', 'S': 'Social', 'E': 'Enterprising', 'C': 'Conventional' };
+    const markdownConverter = new showdown.Converter({ openLinksInNewWindow: true });
     const CSRF_TOKEN = getCookie('csrftoken');
     const URLS = {
         chat: "{% url 'apps:career_coach.chat' journey_id=active_journey.id %}",
@@ -223,41 +505,274 @@ document.addEventListener('DOMContentLoaded', function () {
         submitAnswer: "{% url 'apps:personality_test.submit_answer' %}",
         calculateResult: "{% url 'apps:personality_test.calculate_result' %}",
         resetTest: "{% url 'apps:personality_test.reset' %}",
+        speechToken: "{% url 'apps:speech_token' %}"
     };
 
-    // --- DOM ELEMENTS ---
+    // --- DOM ELEMENTS & MODALS ---
     const chatForm = document.getElementById('chat-form');
     const chatInput = document.getElementById('chat-input');
     const conversationList = document.getElementById('conversation-list');
+    const conversationContainer = document.querySelector('.chat-conversation-container');
     const testBtn = document.getElementById('personality-test-btn');
     const retakeBtn = document.getElementById('retake-test-btn');
+    const micBtn = document.getElementById('mic-btn');
+    const micStatus = document.getElementById('mic-status');
 
-    // --- LIBRARIES & MODALS ---
-    const simpleBar = new SimpleBar(document.querySelector('[data-simplebar]'));
-    const markdownConverter = new showdown.Converter({ openLinksInNewWindow: true });
+    const fontIncreaseBtn = document.getElementById('font-increase');
+    const fontDecreaseBtn = document.getElementById('font-decrease');
+    const floatingFontIncreaseBtn = document.getElementById('floating-font-increase');
+    const floatingFontDecreaseBtn = document.getElementById('floating-font-decrease');
+    const dockChatBtn = document.getElementById('dock-chat-btn');
+    const scrollNavigation = document.getElementById('scroll-navigation');
+    const scrollToPrevBtn = document.getElementById('scroll-to-prev');
+    const scrollToNextBtn = document.getElementById('scroll-to-next');
     const resultModal = new bootstrap.Modal(document.getElementById('personalityResultModal'));
     const testModal = new bootstrap.Modal(document.getElementById('personalityTestModal'));
     new bootstrap.Tooltip(testBtn);
+    if(dockChatBtn) new bootstrap.Tooltip(dockChatBtn);
+    if(micBtn) new bootstrap.Tooltip(micBtn);
+    new bootstrap.Tooltip(floatingFontIncreaseBtn);
+    new bootstrap.Tooltip(floatingFontDecreaseBtn);
+
+    let sentinel;
+    let currentMessageIndex = -1;
+    let messages = [];
+    let speechRecognizer;
+    let isRecognizing = false;
 
     // --- INITIALIZATION ---
     renderExistingMarkdown();
+    setupSmartScrolling();
+    setupFontSizeControls();
+    setupGlobalKeyboardListeners();
+    setupFloatingInput();
+    document.querySelectorAll('.markdown-content').forEach(setupCollapsibleMessages);
     scrollToBottom(true);
     chatForm.addEventListener('submit', handleChatSubmit);
     testBtn.addEventListener('click', handleTestButtonClick);
     retakeBtn.addEventListener('click', handleRetakeTest);
+    dockChatBtn.addEventListener('click', () => { if (sentinel) sentinel.scrollIntoView({ behavior: 'smooth' }); });
+    micBtn.addEventListener('click', handleMicClick);
+    scrollToPrevBtn.addEventListener('click', () => navigateToMessage('prev'));
+    scrollToNextBtn.addEventListener('click', () => navigateToMessage('next'));
 
-    // ==========================================================================
-    // CHAT
-    // ==========================================================================
+    async function getSpeechToken() {
+        try {
+            const res = await fetch(URLS.speechToken);
+            if (!res.ok) throw new Error(`Server error: ${res.status}`);
+            const data = await res.json();
+            if (data.status === 'ok') {
+                return { authToken: data.token, region: data.region };
+            } else {
+                throw new Error(data.message || 'Failed to get token.');
+            }
+        } catch (err) {
+            console.error('Failed to get speech token', err);
+            micStatus.textContent = 'Auth Error';
+            micStatus.style.color = 'var(--vz-danger)';
+            return null;
+        }
+    }
+
+    function stopRecognition() {
+        if (speechRecognizer) {
+            speechRecognizer.stopContinuousRecognitionAsync();
+            isRecognizing = false;
+            micBtn.classList.remove('is-recording');
+            micBtn.innerHTML = '<i class="ri-mic-line align-bottom fs-16"></i>';
+            micStatus.textContent = '';
+        }
+    }
+
+    async function startRecognition() {
+        isRecognizing = true;
+        micBtn.classList.add('is-recording');
+        micBtn.innerHTML = '<i class="ri-mic-off-line align-bottom fs-16"></i>';
+        micStatus.textContent = 'Initializing...';
+        micStatus.style.color = 'var(--vz-muted)';
+        const tokenInfo = await getSpeechToken();
+        if (!tokenInfo) { stopRecognition(); return; }
+        const speechConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(tokenInfo.authToken, tokenInfo.region);
+        speechConfig.speechRecognitionLanguage = 'en-US';
+        const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
+        speechRecognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
+        let fullTranscript = chatInput.value;
+        speechRecognizer.recognizing = (s, e) => {
+            micStatus.textContent = 'Listening...';
+            micStatus.style.color = 'var(--vz-primary)';
+            chatInput.value = fullTranscript + (fullTranscript ? ' ' : '') + e.result.text;
+        };
+        speechRecognizer.recognized = (s, e) => {
+            if (e.result.reason == SpeechSDK.ResultReason.RecognizedSpeech) {
+                fullTranscript += (fullTranscript ? ' ' : '') + e.result.text;
+                chatInput.value = fullTranscript;
+            }
+        };
+        speechRecognizer.canceled = (s, e) => {
+            console.error(`CANCELED: Reason=${e.reason}`);
+            micStatus.textContent = 'Error';
+            micStatus.style.color = 'var(--vz-danger)';
+            stopRecognition();
+        };
+        speechRecognizer.sessionStopped = (s, e) => { stopRecognition(); };
+        speechRecognizer.startContinuousRecognitionAsync();
+    }
+
+    function handleMicClick() {
+        if (isRecognizing) { stopRecognition(); } else { startRecognition(); }
+    }
+
+    function setupFloatingInput() {
+        const chatContainer = document.querySelector('.ai-chat-container');
+        const inputSection = document.getElementById('chat-input-section');
+        if (!chatContainer || !inputSection) return;
+        sentinel = document.createElement('div');
+        sentinel.style.height = '1px';
+        inputSection.parentNode.insertBefore(sentinel, inputSection);
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                const isFloating = !entry.isIntersecting;
+                inputSection.classList.toggle('is-floating', isFloating);
+                chatContainer.classList.toggle('has-floating-input', isFloating);
+                dockChatBtn.classList.toggle('is-visible', isFloating);
+            });
+        }, { threshold: 0 });
+        observer.observe(sentinel);
+    }
+
+    function setupSmartScrolling() {
+        if (!conversationContainer || !scrollNavigation) return;
+        conversationContainer.addEventListener('scroll', () => {
+            updateMessageList();
+            updateCurrentMessageIndex();
+            updateNavigationButtons();
+        });
+        setTimeout(() => {
+            updateMessageList();
+            updateCurrentMessageIndex();
+            updateNavigationButtons();
+        }, 100);
+    }
+
+    function updateMessageList() {
+        messages = Array.from(conversationList.querySelectorAll('.chat-list')).filter(el =>
+            !el.classList.contains('chat-welcome-header')
+        );
+    }
+
+    function updateCurrentMessageIndex() {
+        if (messages.length === 0) return;
+        const containerRect = conversationContainer.getBoundingClientRect();
+        const containerCenter = containerRect.top + containerRect.height / 2;
+        let closestIndex = -1;
+        let closestDistance = Infinity;
+        messages.forEach((message, index) => {
+            const messageRect = message.getBoundingClientRect();
+            const messageCenter = messageRect.top + messageRect.height / 2;
+            const distance = Math.abs(messageCenter - containerCenter);
+            if (distance < closestDistance) {
+                closestDistance = distance;
+                closestIndex = index;
+            }
+        });
+        currentMessageIndex = closestIndex;
+    }
+
+    function updateNavigationButtons() {
+        const hasMessages = messages.length > 0;
+        const isAtFirst = currentMessageIndex <= 0;
+        const isAtLast = currentMessageIndex >= messages.length - 1;
+        scrollNavigation.classList.toggle('is-visible', hasMessages);
+        scrollToPrevBtn.classList.toggle('disabled', isAtFirst);
+        scrollToNextBtn.classList.toggle('disabled', isAtLast);
+    }
+
+    function navigateToMessage(direction) {
+        if (messages.length === 0) return;
+        let targetIndex = currentMessageIndex;
+        if (direction === 'prev' && currentMessageIndex > 0) {
+            targetIndex = currentMessageIndex - 1;
+        } else if (direction === 'next' && currentMessageIndex < messages.length - 1) {
+            targetIndex = currentMessageIndex + 1;
+        }
+        if (targetIndex >= 0 && targetIndex < messages.length) {
+            scrollToMessage(targetIndex);
+        }
+    }
+
+    function scrollToMessage(index) {
+        if (index < 0 || index >= messages.length) return;
+        const message = messages[index];
+        const messageRect = message.getBoundingClientRect();
+        const containerRect = conversationContainer.getBoundingClientRect();
+        const offsetFromTop = 80;
+        const targetScrollTop = conversationContainer.scrollTop + messageRect.top - containerRect.top - offsetFromTop;
+        conversationContainer.scrollTo({ top: Math.max(0, targetScrollTop), behavior: 'smooth' });
+        currentMessageIndex = index;
+        updateNavigationButtons();
+    }
+
+    function setupCollapsibleMessages(contentElement) {
+        if (contentElement.scrollHeight <= 250) return;
+        const readLessBtn = document.createElement('div');
+        readLessBtn.textContent = 'Read Less';
+        readLessBtn.className = 'read-less-btn';
+        readLessBtn.addEventListener('click', () => {
+            const isCollapsed = contentElement.classList.contains('is-collapsible');
+            contentElement.classList.toggle('is-collapsible', !isCollapsed);
+            readLessBtn.textContent = isCollapsed ? 'Read Less' : 'Read More';
+        });
+        contentElement.closest('.ctext-wrap').appendChild(readLessBtn);
+    }
+
+    function setupFontSizeControls() {
+        const applyFontSize = (size) => {
+            conversationContainer.style.setProperty('--chat-font-size', `${size}px`);
+            localStorage.setItem('chatFontSize', size);
+        };
+        const getCurrentFontSize = () => parseFloat(getComputedStyle(conversationContainer).getPropertyValue('--chat-font-size')) || 14;
+        const savedSize = localStorage.getItem('chatFontSize');
+        if (savedSize) applyFontSize(parseFloat(savedSize));
+        const handleFontIncrease = () => applyFontSize(Math.min(20, getCurrentFontSize() + 1));
+        const handleFontDecrease = () => applyFontSize(Math.max(12, getCurrentFontSize() - 1));
+        if (fontIncreaseBtn) fontIncreaseBtn.addEventListener('click', handleFontIncrease);
+        if (fontDecreaseBtn) fontDecreaseBtn.addEventListener('click', handleFontDecrease);
+        floatingFontIncreaseBtn.addEventListener('click', handleFontIncrease);
+        floatingFontDecreaseBtn.addEventListener('click', handleFontDecrease);
+    }
+
+    function setupGlobalKeyboardListeners() {
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                const activeEl = document.activeElement;
+                if (activeEl === chatInput) { chatForm.requestSubmit(); }
+                else if (!activeEl || !['INPUT', 'TEXTAREA'].includes(activeEl.tagName) && !activeEl.isContentEditable) {
+                    event.preventDefault();
+                    chatInput.focus();
+                    scrollToBottom(false);
+                }
+            }
+        });
+    }
+
+    function scrollToBottom(instant = false) {
+        if (!conversationContainer) return;
+        conversationContainer.scrollTo({ top: conversationContainer.scrollHeight, behavior: instant ? 'auto' : 'smooth' });
+        setTimeout(() => {
+            updateMessageList();
+            currentMessageIndex = messages.length - 1;
+            updateNavigationButtons();
+        }, instant ? 0 : 300);
+    }
+
     async function handleChatSubmit(e) {
         e.preventDefault();
+        stopRecognition();
         const messageText = chatInput.value.trim();
         if (!messageText) return;
-
         appendMessage(messageText, 'user', new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
         chatInput.value = '';
         chatInput.disabled = true;
-
         try {
             const response = await fetch(URLS.chat, {
                 method: 'POST',
@@ -267,7 +782,9 @@ document.addEventListener('DOMContentLoaded', function () {
             const data = await response.json();
             if (data.status === 'success') {
                 appendMessage(data.ai_message, 'ai', data.ai_timestamp);
-            } else throw new Error(data.message);
+            } else {
+                throw new Error(data.message || 'Unknown server error');
+            }
         } catch (error) {
             appendMessage(`Sorry, an error occurred: ${error.message}.`, 'ai', 'Now');
         } finally {
@@ -276,139 +793,138 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // ==========================================================================
-    // PERSONALITY TEST UX FLOW
-    // ==========================================================================
-    function handleTestButtonClick() {
-        if (userPersonalityType) {
-            // If user has a result, show the result modal first
-            document.getElementById('result-code-badge').textContent = userPersonalityType;
-            const primaryTypeDescription = HOLLAND_CODES[userPersonalityType[0]] || 'Unknown';
-            document.getElementById('result-description').textContent = primaryTypeDescription;
-            resultModal.show();
-        } else {
-            // If no result, start the test directly
-            startTest();
-        }
-    }
-
-    async function handleRetakeTest() {
-        resultModal.hide();
-        console.log('[Test] Retake initiated. Resetting answers...');
-        const response = await fetch(URLS.resetTest, {
-            method: 'POST', headers: { 'X-CSRFToken': CSRF_TOKEN }
-        });
-        if (response.ok) {
-            userPersonalityType = ''; // Clear state
-            startTest();
-        } else {
-            alert('Could not reset the assessment. Please try again.');
-        }
-    }
-
-    function startTest() {
-        testModal.show();
-        runTestFlow();
-    }
-
-    async function runTestFlow() {
-        showTestView('loading');
-        try {
-            const data = await fetch(URLS.getQuestion).then(res => res.json());
-            if (data.status === 'complete') {
-                await calculateAndShowFinalResults();
-            } else {
-                renderQuestion(data);
-                showTestView('question');
-            }
-        } catch (error) { console.error('[Test] Error in test flow:', error); }
-    }
-
-    async function submitAnswer(questionId, choiceId) {
-        await fetch(URLS.submitAnswer, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
-            body: JSON.stringify({ question_id: questionId, choice_id: choiceId })
-        });
-        await runTestFlow();
-    }
-
-    async function calculateAndShowFinalResults() {
-        showTestView('loading');
-        const data = await fetch(URLS.calculateResult).then(res => res.json());
-        if (data.status === 'success') {
-            userPersonalityType = data.result_code;
-            showTestView('result'); // Show simple "Complete!" message in test modal
-            // Post a message to the chat with the new results
-            const resultMessage = `### Assessment Complete!\nMy analysis shows your new primary career personality is **${data.primary_type} (${data.result_code})**. I'll use this to tailor my suggestions. What's next?`;
-            appendMessage(resultMessage, 'ai', 'Now');
-        }
-    }
-
-    // ==========================================================================
-    // UI & UTILITY FUNCTIONS
-    // ==========================================================================
-    function renderQuestion(data) {
-        document.getElementById('testQuestionText').textContent = data.question_text;
-        const choicesContainer = document.getElementById('testChoicesContainer');
-        choicesContainer.innerHTML = '';
-        data.choices.forEach(choice => {
-            const button = document.createElement('button');
-            button.className = 'btn choice-btn';
-            button.textContent = choice.text;
-            button.onclick = () => {
-                choicesContainer.querySelectorAll('.choice-btn').forEach(btn => btn.disabled = true);
-                setTimeout(() => submitAnswer(data.question_id, choice.id), 200);
-            };
-            choicesContainer.appendChild(button);
-        });
-        const progress = (data.progress.current / data.progress.total) * 100;
-        const progressBar = document.getElementById('testProgressBar');
-        progressBar.style.width = `${progress}%`;
-        progressBar.textContent = `${data.progress.current} / ${data.progress.total}`;
-    }
-
-    function showTestView(viewName) {
-        ['loading', 'question', 'result'].forEach(v => {
-            document.getElementById(`test-${v}-view`).style.display = (v === viewName) ? 'block' : 'none';
-        });
-    }
-
     function appendMessage(text, sender, timestamp) {
+        const isAtBottom = conversationContainer.scrollHeight - conversationContainer.clientHeight <= conversationContainer.scrollTop + 50;
         conversationList.querySelector('.chat-welcome-header')?.remove();
         const li = document.createElement('li');
         li.className = `chat-list ${sender === 'user' ? 'right' : 'left'}`;
-        const avatar = sender === 'ai' ? `<div class="chat-avatar me-3"><img src="{% static 'images/logo-sm.png'%}" class="rounded-circle avatar-xs" alt=""></div>` : '';
-        li.innerHTML = `<div class="conversation-list">${avatar}<div class="user-chat-content"><div class="ctext-wrap"><div class="ctext-wrap-content markdown-content">${markdownConverter.makeHtml(text)}</div></div><div class="conversation-name mt-1"><span class="name text-muted fs-11">${sender === 'user' ? 'You' : 'AI Coach'}</span> <span class="time text-muted fs-11">${timestamp}</span></div></div></div>`;
+        const avatar = sender === 'ai' ? `<div class="chat-avatar me-3"><img src="{% static 'images/logo-sm.gif'%}" class="rounded-circle avatar-md" alt=""></div>` : '';
+        li.innerHTML = `<div class="conversation-list">${avatar}<div class="user-chat-content"><div class="ctext-wrap"><div class="ctext-wrap-content markdown-content"></div></div><div class="conversation-name mt-1"><span class="name text-muted fs-11">${sender === 'user' ? 'You' : 'AI Coach'}</span> <span class="time text-muted fs-11">${timestamp}</span></div></div></div>`;
+        const contentEl = li.querySelector('.markdown-content');
+        contentEl.innerHTML = markdownConverter.makeHtml(text);
         conversationList.appendChild(li);
-        scrollToBottom();
-    }
+        setupCollapsibleMessages(contentEl);
+        setTimeout(() => {
+            updateMessageList();
+           if (sender === 'user' || isAtBottom) {
+               scrollToMessage(messages.length - 1);
+           }
+       }, 150);
+   }
 
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            for (const cookie of document.cookie.split(';')) {
-                const [key, value] = cookie.trim().split('=');
-                if (key === name) {
-                    cookieValue = decodeURIComponent(value);
-                    break;
-                }
+   function handleTestButtonClick() {
+       if (userPersonalityType) {
+           document.getElementById('result-code-badge').textContent = userPersonalityType;
+           document.getElementById('result-description').textContent = HOLLAND_CODES[userPersonalityType[0]] || 'Unknown';
+           resultModal.show();
+       } else {
+           startTest();
+       }
+   }
+
+   async function handleRetakeTest() {
+       resultModal.hide();
+       const response = await fetch(URLS.resetTest, { method: 'POST', headers: { 'X-CSRFToken': CSRF_TOKEN } });
+       if (response.ok) { userPersonalityType = ''; startTest(); }
+       else { alert('Could not reset the assessment. Please try again.'); }
+   }
+
+   function startTest() { testModal.show(); runTestFlow(); }
+
+   async function runTestFlow() {
+       showTestView('loading');
+       try {
+           const data = await fetch(URLS.getQuestion).then(res => res.json());
+           if (data.status === 'complete') {
+               await calculateAndShowFinalResults();
+           } else {
+               renderQuestion(data);
+               showTestView('question');
+           }
+       } catch (error) {
+           console.error('[Test] Error in test flow:', error);
+           alert('Failed to load the assessment. Please check your connection and try again.');
+           testModal.hide();
+       }
+   }
+
+   async function submitAnswer(questionId, choiceId) {
+       await fetch(URLS.submitAnswer, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN }, body: JSON.stringify({ question_id: questionId, choice_id: choiceId }) });
+       await runTestFlow();
+   }
+    
+    // ==========================================================================
+    // ==                          THE FIX IS HERE                               ==
+    // ==========================================================================
+    async function calculateAndShowFinalResults() {
+        showTestView('loading');
+        // --- THIS IS THE CORRECTED FETCH CALL ---
+        // We now use method: 'POST' to match the backend view.
+        const response = await fetch(URLS.calculateResult, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': CSRF_TOKEN
             }
-        }
-        return cookieValue;
-    }
-
-    function scrollToBottom(instant = false) {
-        const scrollEl = simpleBar.getScrollElement();
-        const options = { top: scrollEl.scrollHeight, behavior: instant ? 'auto' : 'smooth' };
-        setTimeout(() => scrollEl.scrollTo(options), instant ? 0 : 50);
-    }
-
-    function renderExistingMarkdown() {
-        document.querySelectorAll('.markdown-content').forEach(el => {
-            el.innerHTML = markdownConverter.makeHtml(el.innerHTML.trim());
         });
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            userPersonalityType = data.result_code;
+            showTestView('result');
+            const resultMessage = `### Assessment Complete!\nMy analysis is that your career personality is **${data.primary_type} (${data.result_code})**. I'll use this to tailor my suggestions. What's next?`;
+            appendMessage(resultMessage, 'ai', 'Now');
+        } else {
+            alert('Could not calculate your results. Please try retaking the assessment.');
+        }
     }
+
+   function renderQuestion(data) {
+       document.getElementById('testQuestionText').textContent = data.question_text;
+       const choicesContainer = document.getElementById('testChoicesContainer');
+       choicesContainer.innerHTML = '';
+       data.choices.forEach(choice => {
+           const button = document.createElement('button');
+           button.className = 'btn choice-btn';
+           button.textContent = choice.text;
+           button.onclick = () => {
+               choicesContainer.querySelectorAll('.choice-btn').forEach(btn => btn.disabled = true);
+               setTimeout(() => submitAnswer(data.question_id, choice.id), 200);
+           };
+           choicesContainer.appendChild(button);
+       });
+       const progress = (data.progress.current / data.progress.total) * 100;
+       const progressBar = document.getElementById('testProgressBar');
+       progressBar.style.width = `${progress}%`;
+       progressBar.setAttribute('aria-valuenow', progress);
+       progressBar.textContent = `${data.progress.current} / ${data.progress.total}`;
+   }
+
+   function showTestView(viewName) {
+       ['loading', 'question', 'result'].forEach(v => {
+           document.getElementById(`test-${v}-view`).style.display = (v === viewName) ? 'block' : 'none';
+       });
+   }
+
+   function getCookie(name) {
+       let cookieValue = null;
+       if (document.cookie && document.cookie !== '') {
+           for (const cookie of document.cookie.split(';')) {
+               const [key, value] = cookie.trim().split('=');
+               if (key === name) {
+                   cookieValue = decodeURIComponent(value);
+                   break;
+               }
+           }
+       }
+       return cookieValue;
+   }
+
+   function renderExistingMarkdown() {
+       document.querySelectorAll('.markdown-content').forEach(el => {
+           el.innerHTML = markdownConverter.makeHtml(el.textContent.trim());
+       });
+   }
 });
 </script>
 {% endblock extra_js %}

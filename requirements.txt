@@ -1,0 +1,40 @@
+# Core Django & Server
+Django==4.1.13
+gunicorn
+whitenoise
+python-dotenv
+daphne
+
+# Database
+mysqlclient
+# Redis Cache
+django-redis==5.4.0
+
+# Channels (for async/websockets)
+channels
+channels-redis
+
+# Authentication
+django-allauth
+
+# OpenAI and Azure
+openai
+azure-core
+azure-ai-textanalytics
+
+# Forms & UI
+django-crispy-forms
+crispy-bootstrap5
+django-multiselectfield
+Pillow
+
+# Other Utilities
+requests
+markdown
+markdown2
+twilio
+
+# Azure Face API
+azure-cognitiveservices-vision-face
+
+azure-ai-vision-imageanalysis==1.0.0b2 # 

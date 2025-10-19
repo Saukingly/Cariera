@@ -41,3 +41,6 @@ azure-ai-vision-imageanalysis
 
 python-dotenv
 mysqlclient
+
+gunicorn
+uvicorn

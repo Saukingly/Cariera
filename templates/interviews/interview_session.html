@@ -59,6 +59,10 @@
                             <i class="ri-loader-4-line spin"></i> Connecting to session...
                         </div>
 
+                        <div id="connection-lost-alert" class="alert alert-danger d-none">
+                            Connection lost. Please check your internet connection.
+                        </div>
+
                         <div class="my-4">
                             <button id="mic-button" class="btn btn-primary btn-lg rounded-circle" style="width: 80px; height: 80px;" disabled>
                                 <i class="ri-mic-off-fill fs-2"></i>
@@ -82,7 +86,7 @@
 {% endblock content %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@latest/distrib/browser/microsoft.cognitiveservices.speech.sdk.bundle.js"></script>
+<script src="https://cdn.jsdelivr/npm/microsoft-cognitiveservices-speech-sdk@latest/distrib/browser/microsoft.cognitiveservices.speech.sdk.bundle.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", function () {
     const sessionId = "{{ session.id }}";
@@ -98,7 +102,6 @@ document.addEventListener("DOMContentLoaded", function () {
     let frameCaptureInterval;
     let interviewEnded = false;
 
-    // ... (DOM element variables are unchanged) ...
     const statusIndicator = document.getElementById('status-indicator');
     const micButton = document.getElementById('mic-button');
     const transcriptBox = document.getElementById('transcript-box');
@@ -108,14 +111,13 @@ document.addEventListener("DOMContentLoaded", function () {
     const videoContainer = document.getElementById('video-container');
     const userVideo = document.getElementById('user-video');
     const csrfToken = '{{ csrf_token }}';
+    const connectionLostAlert = document.getElementById('connection-lost-alert');
 
-    // ... (Event listeners are unchanged) ...
     micButton.addEventListener('click', toggleMicrophone);
     endInterviewBtn.addEventListener('click', endInterview);
     cameraSwitch.addEventListener('change', handleCameraToggle);
 
-    // Initialize the application
-    initializeWebSocket();
+    initializeWebSocket(sessionId); // Pass sessionId to the function
     if (typeof SpeechSDK !== 'undefined') {
         initializeSpeechSDK();
     } else {
@@ -126,12 +128,10 @@ document.addEventListener("DOMContentLoaded", function () {
     function captureAndAnalyzeFrame() {
         if (!userVideo.srcObject || userVideo.paused || userVideo.ended || document.hidden) return;
         
-        // --- NEW: Add the glow effect ---
         videoContainer.classList.add('capture-effect');
-        // Remove the class after the animation completes
         setTimeout(() => {
             videoContainer.classList.remove('capture-effect');
-        }, 1000); // 1s matches the animation duration
+        }, 1000);
 
         const canvas = document.createElement('canvas');
         canvas.width = userVideo.videoWidth;
@@ -157,9 +157,6 @@ document.addEventListener("DOMContentLoaded", function () {
         updateStatus("AI is speaking...", "warning");
         if(micButton) micButton.disabled = true;
 
-        // --- THE AUDIO FIX ---
-        // Instead of closing the old synthesizer, we create a new one for each utterance.
-        // This is the recommended pattern from Microsoft to avoid state management issues.
         const speechConfig = SpeechSDK.SpeechConfig.fromSubscription(speechKey, speechRegion);
         const localSynthesizer = new SpeechSDK.SpeechSynthesizer(speechConfig);
 
@@ -179,7 +176,6 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    // --- The `endInterview` function is now fully robust ---
     function endInterview() {
         if (interviewEnded) return;
         interviewEnded = true;
@@ -196,7 +192,6 @@ document.addEventListener("DOMContentLoaded", function () {
         if (userVideo.srcObject) userVideo.srcObject.getTracks().forEach(track => track.stop());
         if (interviewSocket && interviewSocket.readyState === WebSocket.OPEN) interviewSocket.close();
         
-        // Use a try/catch to safely close SDK objects that might already be disposed
         try {
             if (speechRecognizer) {
                 speechRecognizer.stopContinuousRecognitionAsync(() => {
@@ -206,14 +201,9 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         } catch (e) { console.warn("Could not close speech recognizer:", e); }
         
-        // This is no longer needed as synthesizer is locally scoped in speakText
-        // try { if (synthesizer) { synthesizer.close(); synthesizer = undefined; } } 
-        // catch (e) { console.warn("Could not close synthesizer:", e); }
-
         setTimeout(() => document.getElementById('result-form').submit(), 3000);
     }
 
-    // --- NO CHANGES NEEDED for the functions below ---
     async function handleCameraToggle() {
         if (this.checked) {
             try {
@@ -228,11 +218,28 @@ document.addEventListener("DOMContentLoaded", function () {
             clearInterval(frameCaptureInterval);
         }
     }
-    function initializeWebSocket() {
-        const wsProtocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-        const wsUrl = `${wsProtocol}${window.location.host}/ws/interview/${sessionId}/`;
+    
+    // ==========================================================================
+    // ==                          THE FINAL FIX                               ==
+    // ==========================================================================
+    function initializeWebSocket(sessionId) {
+        const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+        const host = window.location.host;
+
+        // --- THIS IS THE CORRECTED URL ---
+        // It now includes the '/apps' prefix to match our project-level routing.
+        const wsUrl = `${protocol}://${host}/apps/ws/interview/${sessionId}/`;
+        
+        console.log(`[WebSocket] Connecting to: ${wsUrl}`);
+        
         interviewSocket = new WebSocket(wsUrl);
-        interviewSocket.onopen = () => updateStatus("Waiting for AI to start...", "info");
+
+        interviewSocket.onopen = () => {
+            console.log("[WebSocket] Connection established.");
+            updateStatus("Waiting for AI to start...", "info");
+            connectionLostAlert.classList.add('d-none'); // Hide alert on successful connection
+        };
+
         interviewSocket.onmessage = (e) => {
             const data = JSON.parse(e.data);
             if (data.type === 'ai_response' && !interviewEnded) {
@@ -241,8 +248,26 @@ document.addEventListener("DOMContentLoaded", function () {
                 speakText(data.message);
             }
         };
-        interviewSocket.onclose = () => { if (!interviewEnded) { updateStatus("Connection lost.", "danger"); if(micButton) micButton.disabled = true; } };
+        
+        interviewSocket.onclose = () => { 
+            if (!interviewEnded) { 
+                console.error("[WebSocket] Connection closed unexpectedly.");
+                updateStatus("Connection lost.", "danger");
+                connectionLostAlert.classList.remove('d-none'); // Show alert
+                if(micButton) micButton.disabled = true; 
+            } 
+        };
+
+        interviewSocket.onerror = (error) => {
+            console.error(`[WebSocket] Error: ${error.message}`);
+            updateStatus("A connection error occurred.", "danger");
+            connectionLostAlert.classList.remove('d-none'); // Show alert
+        };
     }
+    // ==========================================================================
+    // ==========================================================================
+
+
     function initializeSpeechSDK() {
         const speechConfig = SpeechSDK.SpeechConfig.fromSubscription(speechKey, speechRegion);
         speechConfig.speechRecognitionLanguage = "en-US";
@@ -266,7 +291,7 @@ document.addEventListener("DOMContentLoaded", function () {
     function stopListening() { if (speechRecognizer && !interviewEnded) { updateStatus("Processing...", "info"); micButton.innerHTML = `<i class="ri-mic-off-fill fs-2"></i>`; micButton.classList.replace('btn-danger', 'btn-primary'); micButton.disabled = true; speechRecognizer.stopContinuousRecognitionAsync(); } }
     function toggleMicrophone() { if (micButton.classList.contains('btn-danger')) stopListening(); else startListening(); }
     function updateStatus(message, type) { statusIndicator.textContent = message; statusIndicator.className = `status-indicator alert alert-${type}`; }
-    function addTranscriptEntry(speaker, text) { const entry = document.createElement('div'); entry.classList.add('transcript-entry'); entry.innerHTML = `<p class="mb-1"><span class="transcript-speaker ${speaker.toLowerCase()}">${speaker}:</span></p><p class="text-muted ps-2">${text}</p>`; transcriptBox.appendChild(entry); transcriptBox.scrollTop = transcriptBox.scrollHeight; }
+    function addTranscriptEntry(speaker, text) { const entry = document.createElement('div'); entry.classList.add('transcript-entry'); entry.innerHTML = `<p class="mb-1"><span class="transcript-speaker ${speaker.toLowerCase()}"><strong>${speaker}:</strong></span></p><p class="text-muted ps-2">${text}</p>`; transcriptBox.appendChild(entry); transcriptBox.scrollTop = transcriptBox.scrollHeight; }
     function startTimer() { let seconds = 0; timerInterval = setInterval(() => { if (interviewEnded) { clearInterval(timerInterval); return; } seconds++; const mins = String(Math.floor(seconds / 60)).padStart(2, '0'); const secs = String(seconds % 60).padStart(2, '0'); timerDisplay.textContent = `${mins}:${secs}`; if (seconds >= interviewDurationSeconds) endInterview(); }, 1000); }
 });
 </script>

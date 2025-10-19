@@ -1,31 +1,25 @@
+# velzon/asgi.py
+
 import os
-import django
-
-# Set Django settings FIRST
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'velzon.settings')
-
-# Initialize Django BEFORE importing any Django models
-django.setup()
-
-# NOW import Django and Channels stuff
 from django.core.asgi import get_asgi_application
-from channels.routing import ProtocolTypeRouter, URLRouter
+from channels.routing import ProtocolTypeRouter
 from channels.auth import AuthMiddlewareStack
 from channels.security.websocket import AllowedHostsOriginValidator
 
-# Get Django ASGI app
-django_asgi_app = get_asgi_application()
+# Import the new project-level router
+import velzon.routing
 
-# Import routing AFTER django.setup()
-import apps.routing
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'velzon.settings')
+
+django_asgi_app = get_asgi_application()
 
 application = ProtocolTypeRouter({
     "http": django_asgi_app,
+
+    # Point the websocket key to our new project-level router
     "websocket": AllowedHostsOriginValidator(
         AuthMiddlewareStack(
-            URLRouter(
-                apps.routing.websocket_urlpatterns
-            )
+            velzon.routing.application
         )
     ),
 })

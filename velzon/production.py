@@ -9,28 +9,41 @@ DEBUG = False
 SECRET_KEY = os.environ.get('SECRET_KEY')
 
 # ==============================================================================
-# AZURE HOSTNAME CONFIGURATION
+# AZURE HOSTNAME CONFIGURATION (SELF-CONTAINED)
 # ==============================================================================
 AZURE_HOSTNAME = os.environ.get('WEBSITE_HOSTNAME')
-ALLOWED_HOSTS = []
-if AZURE_HOSTNAME:
-    ALLOWED_HOSTS.append(AZURE_HOSTNAME)
 
-print(f"[Startup] Allowed hosts configured: {ALLOWED_HOSTS}")
+# Define ALLOWED_HOSTS from scratch in this file for clarity and reliability
+ALLOWED_HOSTS = []
+
+if AZURE_HOSTNAME:
+    # This is the host the browser will use. It MUST be in this list.
+    ALLOWED_HOSTS.append(AZURE_HOSTNAME)
+else:
+    print("[Startup] WARNING: WEBSITE_HOSTNAME environment variable not found!")
+
+# Add the internal IPs Azure uses for health checks
+ALLOWED_HOSTS.extend(['169.254.130.2', '169.254.131.2'])
+
+# Log the final list to the startup logs to be 100% sure
+print(f"[Startup] Final ALLOWED_HOSTS list for production: {ALLOWED_HOSTS}")
 
 # ==============================================================================
 # CSRF and Security
 # ==============================================================================
-CSRF_TRUSTED_ORIGINS = [
-    f"https://{AZURE_HOSTNAME}"
-] if AZURE_HOSTNAME else []
+CSRF_TRUSTED_ORIGINS = []
+if AZURE_HOSTNAME:
+    CSRF_TRUSTED_ORIGINS.append(f"https://{AZURE_HOSTNAME}")
+
+print(f"[Startup] Final CSRF_TRUSTED_ORIGINS list: {CSRF_TRUSTED_ORIGINS}")
 
 SECURE_SSL_REDIRECT = True
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
-
-# Fix redirect loop behind Azure proxy
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
+USE_X_FORWARDED_PORT = True
+
 
 # Base directory
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -62,6 +75,7 @@ REDIS_HOST = 'redicach3.redis.cache.windows.net'
 REDIS_PORT = 6380
 
 if REDIS_PASSWORD:
+    # --- Django Cache configuration ---
     CACHES = {
         "default": {
             "BACKEND": "django_redis.cache.RedisCache",
@@ -73,15 +87,12 @@ if REDIS_PASSWORD:
         }
     }
     
-    # ✅ FIXED: Proper Redis URL format for Channels on Azure
+    # --- Channels Layer configuration (standard format) ---
     CHANNEL_LAYERS = {
         "default": {
             "BACKEND": "channels_redis.core.RedisChannelLayer",
             "CONFIG": {
-                "hosts": [{
-                    "address": f"rediss://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/1",
-                    "ssl_cert_reqs": None,
-                }],
+                "hosts": [(f"rediss://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/1")],
             },
         },
     }
@@ -95,12 +106,4 @@ else:
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 
-# ==============================================================================
-# AZURE APP SERVICES WEBSOCKET CONFIGURATION
-# ==============================================================================
-# Azure App Services uses a different approach for WebSockets
-# These settings ensure proper WebSocket handling
-USE_X_FORWARDED_HOST = True
-USE_X_FORWARDED_PORT = True
-
-print("[Startup] Production settings loaded for Azure App Services")
+print("[Startup] Production settings loaded successfully.")

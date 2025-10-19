@@ -1,27 +1,31 @@
-# velzon/asgi.py
-
 import os
+import django
+
+# Set Django settings FIRST
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'velzon.settings')
+
+# Initialize Django BEFORE importing any Django models
+django.setup()
+
+# NOW import Django and Channels stuff
 from django.core.asgi import get_asgi_application
 from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.auth import AuthMiddlewareStack
+from channels.security.websocket import AllowedHostsOriginValidator
 
-# Import the project-level router
-import velzon.routing
-
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'velzon.settings')
-
+# Get Django ASGI app
 django_asgi_app = get_asgi_application()
+
+# Import routing AFTER django.setup()
+import apps.routing
 
 application = ProtocolTypeRouter({
     "http": django_asgi_app,
-
-    # --- SIMPLIFIED WEBSOCKET ROUTING ---
-    # We are temporarily removing the AllowedHostsOriginValidator.
-    # The AuthMiddlewareStack still ensures that only logged-in users can connect.
-    "websocket": AuthMiddlewareStack(
-        URLRouter(
-            # Pass the actual list of URL patterns directly. This is the most reliable way.
-            velzon.routing.application.url_patterns
+    "websocket": AllowedHostsOriginValidator(
+        AuthMiddlewareStack(
+            URLRouter(
+                apps.routing.websocket_urlpatterns
+            )
         )
     ),
 })

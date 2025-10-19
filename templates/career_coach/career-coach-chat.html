@@ -1,0 +1,414 @@
+{% extends "partials/base.html" %}
+{% load static %}
+
+{% block title %}{{ active_journey.title }}{% endblock title %}
+
+{% block extra_css %}
+<style>
+    /* --- MASTER LAYOUT FIX FOR STICKY FOOTER/INPUT --- */
+    /* This forces the main content area to behave as a flex container, filling the viewport's height */
+    .main-content {
+        display: flex !important;
+        flex-direction: column !important;
+        /* Adjust for topbar height (default: 70px) */
+        min-height: calc(100vh - 70px);
+        max-height: calc(100vh - 70px);
+        padding-bottom: 0 !important; /* Prevents double padding with footer */
+        overflow: hidden; /* Prevent the main content from scrolling */
+    }
+
+    /* These rules ensure all parent containers of the chat can grow and shrink as needed */
+    .page-content, .container-fluid, .chat-row, .chat-row > .col-12 {
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0; /* CRITICAL: Allows flex items to shrink, preventing overflow */
+        padding-bottom: 0 !important;
+        overflow: hidden; /* Prevent these containers from scrolling */
+    }
+    .page-content { padding-top: 24px !important; }
+
+    /* The main chat container: fills all available space and acts as the anchor for the input */
+    .ai-chat-container {
+        position: relative; /* CRITICAL: For positioning the absolute input section */
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+        border: 1px solid var(--vz-border-color);
+        border-radius: var(--vz-card-border-radius);
+        margin-bottom: 24px; /* Space above the page footer */
+        min-height: 0; /* Allow shrinking */
+        overflow: hidden; /* Prevent overflow */
+    }
+
+    /* The message list container: it scrolls, while its parent does not */
+    .chat-conversation-container {
+        flex-grow: 1;
+        overflow-y: auto; /* This is the element that gets the scrollbar */
+        padding: 1.5rem;
+        padding-bottom: 120px; /* Increased space for the input bar - adjust as needed */
+        min-height: 0; /* Allow shrinking */
+    }
+
+    /* The input section: taken out of the normal flow and fixed to the bottom of its parent */
+    .chat-input-section {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background-color: var(--vz-tertiary-bg);
+        border-top: 1px solid var(--vz-border-color);
+        z-index: 10;
+        flex-shrink: 0; /* Prevent the input from shrinking */
+    }
+
+    /* When empty, the welcome header is centered vertically */
+    .chat-conversation-list:has(.chat-welcome-header) {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        min-height: calc(100% - 120px); /* Account for input height */
+    }
+
+    /* --- CHAT BUBBLE & WELCOME STYLES --- */
+    .chat-welcome-header { text-align: center; }
+    .chat-welcome-avatar { width: 70px; height: 70px; background: linear-gradient(45deg, var(--vz-primary), var(--vz-success)); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem auto; box-shadow: 0 0 25px rgba(var(--vz-primary-rgb), 0.3); }
+    .chat-welcome-avatar i { font-size: 2.5rem; color: #fff; }
+    .chat-list { display: flex; margin-bottom: 20px; }
+    .chat-list.right { justify-content: flex-end; }
+    .conversation-list { max-width: 80%; display: flex; align-items: flex-start; }
+    .ctext-wrap-content { padding: 0.75rem 1rem; box-shadow: var(--vz-box-shadow-sm) !important; display: inline-block; text-align: left; word-break: break-word; }
+    .chat-list.left .ctext-wrap-content { background: var(--vz-light) !important; border-radius: 0.5rem 1.25rem 1.25rem 1.25rem; }
+    .chat-list.right .ctext-wrap-content { background-color: var(--vz-primary) !important; color: #fff !important; border-radius: 1.25rem 0.5rem 1.25rem 1.25rem; }
+    .markdown-content p { margin-bottom: 0; }
+    .chat-list.right .markdown-content p, .chat-list.right .markdown-content li, .chat-list.right .markdown-content code { color: white !important; }
+
+    /* --- MODAL STYLES (Both Modals) --- */
+    .modal-content { background-color: #2c3e50; color: #ecf0f1; border-radius: 15px; }
+    .modal-header { border-bottom: 1px solid #34495e; }
+    .modal-header .btn-close { filter: invert(1); }
+    #personalityResultModal .result-code-badge { font-size: 1.25rem; padding: 0.5em 0.75em; }
+    #personalityResultModal .result-description { font-size: 1.5rem; color: #1abc9c; font-weight: 500; }
+
+    /* Test-specific styles */
+    .progress-bar-container { width: 100%; background-color: #34495e; border-radius: 10px; margin-bottom: 2rem; }
+    #testProgressBar { height: 15px; background: linear-gradient(90deg, #1abc9c, #3498db); width: 0%; border-radius: 10px; transition: width 0.5s ease-in-out; text-align: center; color: white; font-weight: bold; }
+    #testQuestionText { font-size: 1.5rem; margin-bottom: 2rem; text-align: center; }
+    .choice-btn { display: block; width: 100%; margin: 0 auto 1rem auto; max-width: 500px; padding: 1rem; background-color: #34495e; border: 2px solid transparent; border-radius: 8px; transition: all 0.3s ease; }
+    .choice-btn:hover { background-color: #4a627a; border-color: #1abc9c; }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="main-content">
+    <div class="page-content">
+        <div class="container-fluid">
+            <!-- Page Title -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="page-title-box d-sm-flex align-items-center justify-content-between">
+                        <h4 class="mb-sm-0">{{ active_journey.title }}</h4>
+                        <div class="page-title-right">
+                            <ol class="breadcrumb m-0">
+                                <li class="breadcrumb-item"><a href="{% url 'apps:journeys.list' %}">My Journeys</a></li>
+                                <li class="breadcrumb-item active">Chat</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat Container -->
+            <div class="row chat-row">
+                <div class="col-12">
+                    <div class="ai-chat-container">
+                        <div class="chat-conversation-container" data-simplebar>
+                            <ul class="list-unstyled chat-conversation-list" id="conversation-list">
+                                {% if not chat_messages %}
+                                <li class="chat-welcome-header">
+                                    <div class="chat-welcome-avatar"><i class="ri-compass-3-line"></i></div>
+                                    <h5>Your Career Begins</h5>
+                                    <p class="text-muted mb-0">What's the first step on your journey?</p>
+                                </li>
+                                {% endif %}
+                                {% for msg in chat_messages %}
+                                <li class="chat-list {% if msg.sender_type == 'user' %}right{% else %}left{% endif %}">
+                                    <div class="conversation-list">
+                                        {% if msg.sender_type == 'ai' %}<div class="chat-avatar me-3"><img src="{% static 'images/logo-sm.png'%}" class="rounded-circle avatar-xs" alt=""></div>{% endif %}
+                                        <div class="user-chat-content">
+                                            <div class="ctext-wrap"><div class="ctext-wrap-content markdown-content">{{ msg.message|safe }}</div></div>
+                                            <div class="conversation-name mt-1"><span class="name text-muted fs-11">{% if msg.sender_type == 'user' %}You{% else %}AI Coach{% endif %}</span> <span class="time text-muted fs-11">{{ msg.timestamp|time:"h:i A" }}</span></div>
+                                        </div>
+                                    </div>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        <div class="chat-input-section p-3">
+                            <form id="chat-form">
+                                <div class="row g-2 align-items-center">
+                                    <div class="col-auto">
+                                        <button type="button" class="btn btn-soft-info" id="personality-test-btn" data-bs-toggle="tooltip" data-bs-placement="top" title="Career Personality">
+                                            <i class="ri-psychotherapy-line align-bottom"></i>
+                                        </button>
+                                    </div>
+                                    <div class="col"><input type="text" class="form-control chat-input" id="chat-input" placeholder="Start your conversation..." autocomplete="off"></div>
+                                    <div class="col-auto"><button type="submit" class="btn btn-success chat-send"><i class="ri-send-plane-2-fill align-bottom"></i></button></div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% include "partials/footer.html" %}
+</div>
+
+<!-- MODAL 1: Shows existing personality result -->
+<div class="modal fade" id="personalityResultModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content text-center p-4">
+            <div class="modal-body">
+                <i class="ri-award-fill fs-1 text-warning mb-3"></i>
+                <h4 class="mb-1">Your Career Personality</h4>
+                <p class="text-muted">This result helps tailor your career suggestions.</p>
+                <div class="mb-4 mt-4">
+                    <p id="result-description" class="result-description"></p>
+                    <span id="result-code-badge" class="badge bg-success-subtle text-success result-code-badge"></span>
+                </div>
+                <div class="hstack gap-2 justify-content-center">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="retake-test-btn">Retake Assessment</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- MODAL 2: The actual personality test questions -->
+<div class="modal fade" id="personalityTestModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">Career Personality Assessment</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body p-4">
+                <div id="test-loading-view" class="text-center"><div class="spinner-border text-light" role="status"></div><p class="mt-2">Loading...</p></div>
+                <div id="test-question-view" style="display: none;"><div class="progress-bar-container"><div id="testProgressBar" role="progressbar"></div></div><h3 id="testQuestionText"></h3><div id="testChoicesContainer" class="mt-4"></div></div>
+                <div id="test-result-view" style="display: none; text-align: center;"><h2 class="mt-3">Assessment Complete!</h2><p>Your results have been saved.</p><button class="btn btn-success mt-3" data-bs-dismiss="modal">Close</button></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/showdown@2.1.0/dist/showdown.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // --- STATE & CONFIG ---
+    let userPersonalityType = "{{ user.profile.personality_type|default:'' }}";
+    const HOLLAND_CODES = {
+        'R': 'Realistic (Doers)', 'I': 'Investigative (Thinkers)', 'A': 'Artistic (Creators)',
+        'S': 'Social (Helpers)', 'E': 'Enterprising (Persuaders)', 'C': 'Conventional (Organizers)'
+    };
+
+    // --- API URLS ---
+    const CSRF_TOKEN = getCookie('csrftoken');
+    const URLS = {
+        chat: "{% url 'apps:career_coach.chat' journey_id=active_journey.id %}",
+        getQuestion: "{% url 'apps:personality_test.get_question' %}",
+        submitAnswer: "{% url 'apps:personality_test.submit_answer' %}",
+        calculateResult: "{% url 'apps:personality_test.calculate_result' %}",
+        resetTest: "{% url 'apps:personality_test.reset' %}",
+    };
+
+    // --- DOM ELEMENTS ---
+    const chatForm = document.getElementById('chat-form');
+    const chatInput = document.getElementById('chat-input');
+    const conversationList = document.getElementById('conversation-list');
+    const testBtn = document.getElementById('personality-test-btn');
+    const retakeBtn = document.getElementById('retake-test-btn');
+
+    // --- LIBRARIES & MODALS ---
+    const simpleBar = new SimpleBar(document.querySelector('[data-simplebar]'));
+    const markdownConverter = new showdown.Converter({ openLinksInNewWindow: true });
+    const resultModal = new bootstrap.Modal(document.getElementById('personalityResultModal'));
+    const testModal = new bootstrap.Modal(document.getElementById('personalityTestModal'));
+    new bootstrap.Tooltip(testBtn);
+
+    // --- INITIALIZATION ---
+    renderExistingMarkdown();
+    scrollToBottom(true);
+    chatForm.addEventListener('submit', handleChatSubmit);
+    testBtn.addEventListener('click', handleTestButtonClick);
+    retakeBtn.addEventListener('click', handleRetakeTest);
+
+    // ==========================================================================
+    // CHAT
+    // ==========================================================================
+    async function handleChatSubmit(e) {
+        e.preventDefault();
+        const messageText = chatInput.value.trim();
+        if (!messageText) return;
+
+        appendMessage(messageText, 'user', new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
+        chatInput.value = '';
+        chatInput.disabled = true;
+
+        try {
+            const response = await fetch(URLS.chat, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+                body: JSON.stringify({ message: messageText })
+            });
+            const data = await response.json();
+            if (data.status === 'success') {
+                appendMessage(data.ai_message, 'ai', data.ai_timestamp);
+            } else throw new Error(data.message);
+        } catch (error) {
+            appendMessage(`Sorry, an error occurred: ${error.message}.`, 'ai', 'Now');
+        } finally {
+            chatInput.disabled = false;
+            chatInput.focus();
+        }
+    }
+
+    // ==========================================================================
+    // PERSONALITY TEST UX FLOW
+    // ==========================================================================
+    function handleTestButtonClick() {
+        if (userPersonalityType) {
+            // If user has a result, show the result modal first
+            document.getElementById('result-code-badge').textContent = userPersonalityType;
+            const primaryTypeDescription = HOLLAND_CODES[userPersonalityType[0]] || 'Unknown';
+            document.getElementById('result-description').textContent = primaryTypeDescription;
+            resultModal.show();
+        } else {
+            // If no result, start the test directly
+            startTest();
+        }
+    }
+
+    async function handleRetakeTest() {
+        resultModal.hide();
+        console.log('[Test] Retake initiated. Resetting answers...');
+        const response = await fetch(URLS.resetTest, {
+            method: 'POST', headers: { 'X-CSRFToken': CSRF_TOKEN }
+        });
+        if (response.ok) {
+            userPersonalityType = ''; // Clear state
+            startTest();
+        } else {
+            alert('Could not reset the assessment. Please try again.');
+        }
+    }
+
+    function startTest() {
+        testModal.show();
+        runTestFlow();
+    }
+
+    async function runTestFlow() {
+        showTestView('loading');
+        try {
+            const data = await fetch(URLS.getQuestion).then(res => res.json());
+            if (data.status === 'complete') {
+                await calculateAndShowFinalResults();
+            } else {
+                renderQuestion(data);
+                showTestView('question');
+            }
+        } catch (error) { console.error('[Test] Error in test flow:', error); }
+    }
+
+    async function submitAnswer(questionId, choiceId) {
+        await fetch(URLS.submitAnswer, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+            body: JSON.stringify({ question_id: questionId, choice_id: choiceId })
+        });
+        await runTestFlow();
+    }
+
+    async function calculateAndShowFinalResults() {
+        showTestView('loading');
+        const data = await fetch(URLS.calculateResult).then(res => res.json());
+        if (data.status === 'success') {
+            userPersonalityType = data.result_code;
+            showTestView('result'); // Show simple "Complete!" message in test modal
+            // Post a message to the chat with the new results
+            const resultMessage = `### Assessment Complete!\nMy analysis shows your new primary career personality is **${data.primary_type} (${data.result_code})**. I'll use this to tailor my suggestions. What's next?`;
+            appendMessage(resultMessage, 'ai', 'Now');
+        }
+    }
+
+    // ==========================================================================
+    // UI & UTILITY FUNCTIONS
+    // ==========================================================================
+    function renderQuestion(data) {
+        document.getElementById('testQuestionText').textContent = data.question_text;
+        const choicesContainer = document.getElementById('testChoicesContainer');
+        choicesContainer.innerHTML = '';
+        data.choices.forEach(choice => {
+            const button = document.createElement('button');
+            button.className = 'btn choice-btn';
+            button.textContent = choice.text;
+            button.onclick = () => {
+                choicesContainer.querySelectorAll('.choice-btn').forEach(btn => btn.disabled = true);
+                setTimeout(() => submitAnswer(data.question_id, choice.id), 200);
+            };
+            choicesContainer.appendChild(button);
+        });
+        const progress = (data.progress.current / data.progress.total) * 100;
+        const progressBar = document.getElementById('testProgressBar');
+        progressBar.style.width = `${progress}%`;
+        progressBar.textContent = `${data.progress.current} / ${data.progress.total}`;
+    }
+
+    function showTestView(viewName) {
+        ['loading', 'question', 'result'].forEach(v => {
+            document.getElementById(`test-${v}-view`).style.display = (v === viewName) ? 'block' : 'none';
+        });
+    }
+
+    function appendMessage(text, sender, timestamp) {
+        conversationList.querySelector('.chat-welcome-header')?.remove();
+        const li = document.createElement('li');
+        li.className = `chat-list ${sender === 'user' ? 'right' : 'left'}`;
+        const avatar = sender === 'ai' ? `<div class="chat-avatar me-3"><img src="{% static 'images/logo-sm.png'%}" class="rounded-circle avatar-xs" alt=""></div>` : '';
+        li.innerHTML = `<div class="conversation-list">${avatar}<div class="user-chat-content"><div class="ctext-wrap"><div class="ctext-wrap-content markdown-content">${markdownConverter.makeHtml(text)}</div></div><div class="conversation-name mt-1"><span class="name text-muted fs-11">${sender === 'user' ? 'You' : 'AI Coach'}</span> <span class="time text-muted fs-11">${timestamp}</span></div></div></div>`;
+        conversationList.appendChild(li);
+        scrollToBottom();
+    }
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            for (const cookie of document.cookie.split(';')) {
+                const [key, value] = cookie.trim().split('=');
+                if (key === name) {
+                    cookieValue = decodeURIComponent(value);
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    function scrollToBottom(instant = false) {
+        const scrollEl = simpleBar.getScrollElement();
+        const options = { top: scrollEl.scrollHeight, behavior: instant ? 'auto' : 'smooth' };
+        setTimeout(() => scrollEl.scrollTo(options), instant ? 0 : 50);
+    }
+
+    function renderExistingMarkdown() {
+        document.querySelectorAll('.markdown-content').forEach(el => {
+            el.innerHTML = markdownConverter.makeHtml(el.innerHTML.trim());
+        });
+    }
+});
+</script>
+{% endblock extra_js %}

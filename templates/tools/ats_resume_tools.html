@@ -1,0 +1,360 @@
+{% extends "partials/base.html" %}
+{% load static %}
+
+{% block title %}ATS & Resume Tools{% endblock title %}
+
+{% block extra_css %}
+<style>
+    .tool-card {
+        transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        height: 100%;
+    }
+    .tool-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    }
+    .tool-card img {
+        height: 200px;
+        object-fit: cover;
+    }
+    .keyword-bubble {
+        display: inline-block;
+        padding: 5px 12px;
+        margin: 4px;
+        border-radius: 20px;
+        background-color: var(--vz-light);
+        border: 1px solid var(--vz-border-color);
+        font-size: 0.9rem;
+    }
+    .bullet-point-item {
+        background-color: var(--vz-light);
+        padding: 10px 15px;
+        border-radius: 5px;
+        margin-bottom: 8px;
+        position: relative;
+    }
+    .copy-bullet-btn {
+        cursor: pointer;
+        opacity: 0.5;
+        transition: opacity 0.2s;
+    }
+    .bullet-point-item:hover .copy-bullet-btn {
+        opacity: 1;
+    }
+    .link-card {
+        transition: all 0.2s ease-in-out;
+        border: 1px solid var(--vz-border-color);
+    }
+    .link-card:hover {
+        transform: translateY(-3px);
+        box-shadow: var(--vz-box-shadow);
+        border-color: var(--vz-primary);
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="main-content">
+    <div class="page-content">
+        <div class="container-fluid">
+            <!-- Page Title -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="page-title-box d-sm-flex align-items-center justify-content-between">
+                        <h4 class="mb-sm-0">ATS & RESUME TOOLS</h4>
+                        <div class="page-title-right">
+                            <ol class="breadcrumb m-0">
+                                <li class="breadcrumb-item"><a href="javascript: void(0);">Tools</a></li>
+                                <li class="breadcrumb-item active">ATS & Resume</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Redesigned Main Card with Two Columns -->
+            <div class="card">
+                <div class="card-body">
+                    <div class="row">
+                        <!-- Left Column: AI Assistant -->
+                        <div class="col-lg-8 border-end-lg">
+                            <div class="d-flex mb-4">
+                                <div class="flex-shrink-0 me-3">
+                                    <i class="ri-robot-2-line text-primary" style="font-size: 2.5rem;"></i>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <h5 class="card-title">AI-Powered Resume Assistant</h5>
+                                    <p class="text-muted mb-0">Use AI to generate keywords and optimize your accomplishments for your target career.</p>
+                                </div>
+                            </div>
+
+                            <!-- Career Selection -->
+                            <div class="mb-4">
+                                <label for="career-select" class="form-label fw-bold">Step 1: Select Your Target Career</label>
+                                <select class="form-select" id="career-select">
+                                    <option selected disabled>Choose a career from your Action Plans...</option>
+                                    {% for plan in action_plans %}
+                                        <option value="{{ plan.career.name }}">{{ plan.career.name }}</option>
+                                    {% empty %}
+                                        <option disabled>Create an Action Plan to get started.</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <!-- Tab Navigation -->
+                            <ul class="nav nav-tabs nav-tabs-custom nav-success" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <a class="nav-link active" data-bs-toggle="tab" href="#bulletOptimizer" role="tab" aria-selected="true">Bullet Point Optimizer</a>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <a class="nav-link" data-bs-toggle="tab" href="#keywordGenerator" role="tab" aria-selected="false">Keyword Generator</a>
+                                </li>
+                            </ul>
+
+                            <!-- Tab Content -->
+                            <div class="tab-content text-muted pt-4">
+                                <!-- Bullet Point Optimizer Tab -->
+                                <div class="tab-pane active" id="bulletOptimizer" role="tabpanel">
+                                    <h6>Step 2: Describe Your Accomplishment</h6>
+                                    <textarea id="raw-text-input" class="form-control" rows="4" placeholder="Example: I worked on the checkout page for our e-commerce site. I helped fix some bugs and made the page load faster."></textarea>
+                                    <button class="btn btn-primary mt-3" id="optimize-text-btn">
+                                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                                        Optimize Bullet Points
+                                    </button>
+                                    <div id="optimized-results-wrapper" style="display: none;">
+                                        <!-- Coach's Suggestions Box -->
+                                        <div id="suggestions-container" class="alert alert-info mt-4" style="display: none;">
+                                            <h6 class="alert-heading"><i class="ri-lightbulb-flash-line align-middle me-1"></i> Coach's Suggestions</h6>
+                                            <ul id="suggestions-list" class="mb-0"></ul>
+                                        </div>
+                                        <!-- AI-Generated Suggestions -->
+                                        <div id="optimized-results-container" class="mt-4">
+                                            <h6>AI-Generated Suggestions:</h6>
+                                            <div id="optimized-list"></div>
+                                        </div>
+                                        <!-- Disclaimer Box -->
+                                        <div id="disclaimer-container" class="alert alert-warning mt-3" style="display: none;">
+                                            <i class="ri-error-warning-line align-middle me-1"></i>
+                                            <small>AI-generated content may not be 100% accurate. Please review and edit for factual correctness before adding to your resume.</small>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Keyword Generator Tab -->
+                                <div class="tab-pane" id="keywordGenerator" role="tabpanel">
+                                     <h6>Step 2: Generate Keywords</h6>
+                                     <p>Click the button to generate a list of essential keywords for your selected career.</p>
+                                     <button class="btn btn-primary" id="get-keywords-btn">
+                                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                                        Get Keywords
+                                    </button>
+                                    <div id="keywords-result-container" class="mt-4" style="display: none;">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <h6>Recommended Keywords:</h6>
+                                            <button class="btn btn-soft-secondary btn-sm" id="copy-keywords-btn"><i class="ri-file-copy-line align-middle me-1"></i> Copy All</button>
+                                        </div>
+                                        <div id="keywords-list"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right Column: External Tools -->
+                        <div class="col-lg-4 mt-4 mt-lg-0">
+                            <div class="ps-lg-3">
+                                <h5 class="mb-3">External Tools</h5>
+                                <p class="text-muted">Use your AI-generated content with these free, powerful tools.</p>
+
+                                <!-- Link Card 1: Resume Builder -->
+                                <a href="https://rxresu.me/auth/register?displayName={{ user.first_name|default:user.username }}&email={{ user.email }}" class="card link-card bg-light bg-opacity-50" target="_blank">
+                                    <div class="card-body d-flex align-items-center">
+                                        <div class="flex-shrink-0">
+                                            <i class="ri-file-add-line fs-1 text-primary"></i>
+                                        </div>
+                                        <div class="flex-grow-1 ms-3">
+                                            <h6 class="mb-1">Resume Builder</h6>
+                                            <p class="text-muted mb-0">Build your resume on RX Resume.</p>
+                                        </div>
+                                    </div>
+                                </a>
+
+                                <!-- Link Card 2: Resume Checker -->
+                                <a href="https://www.resumego.net/resume-checker/" class="card link-card bg-light bg-opacity-50 mt-3" target="_blank">
+                                    <div class="card-body d-flex align-items-center">
+                                        <div class="flex-shrink-0">
+                                            <i class="ri-file-search-line fs-1 text-success"></i>
+                                        </div>
+                                        <div class="flex-grow-1 ms-3">
+                                            <h6 class="mb-1">ATS Resume Checker</h6>
+                                            <p class="text-muted mb-0">Check your score on ResumeGo.</p>
+                                        </div>
+                                    </div>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const careerSelect = document.getElementById('career-select');
+    const csrfToken = '{{ csrf_token }}';
+
+    // --- Bullet Point Optimizer Logic ---
+    const optimizeBtn = document.getElementById('optimize-text-btn');
+    const rawTextInput = document.getElementById('raw-text-input');
+    const optimizedResultsWrapper = document.getElementById('optimized-results-wrapper');
+    const optimizedList = document.getElementById('optimized-list');
+    const suggestionsContainer = document.getElementById('suggestions-container');
+    const suggestionsList = document.getElementById('suggestions-list');
+    const disclaimerContainer = document.getElementById('disclaimer-container');
+    const optimizeSpinner = optimizeBtn.querySelector('.spinner-border');
+
+    optimizeBtn.addEventListener('click', async function() {
+        const selectedCareer = careerSelect.value;
+        const rawText = rawTextInput.value.trim();
+
+        if (!selectedCareer || careerSelect.selectedIndex === 0) {
+            alert('Please select a target career first.');
+            return;
+        }
+        if (!rawText) {
+            alert('Please describe your accomplishment in the text box.');
+            return;
+        }
+
+        optimizeSpinner.style.display = 'inline-block';
+        optimizeBtn.disabled = true;
+        optimizedResultsWrapper.style.display = 'none';
+        optimizedList.innerHTML = '';
+        suggestionsList.innerHTML = '';
+        suggestionsContainer.style.display = 'none';
+        disclaimerContainer.style.display = 'none';
+
+
+        try {
+            const response = await fetch("{% url 'apps:api.optimize_resume_text' %}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify({ career: selectedCareer, text: rawText })
+            });
+            if (!response.ok) throw new Error('API request failed');
+            const data = await response.json();
+
+            // Populate Bullet Points
+            if (data.bullet_points && data.bullet_points.length > 0) {
+                data.bullet_points.forEach(point => {
+                    const item = document.createElement('div');
+                    item.className = 'bullet-point-item d-flex align-items-center justify-content-between';
+                    item.innerHTML = `<span>${point}</span><i class="ri-file-copy-line copy-bullet-btn" title="Copy"></i>`;
+                    optimizedList.appendChild(item);
+                });
+            }
+
+            // Populate Suggestions
+            if (data.suggestions && data.suggestions.length > 0) {
+                data.suggestions.forEach(suggestion => {
+                    const item = document.createElement('li');
+                    item.textContent = suggestion;
+                    suggestionsList.appendChild(item);
+                });
+                suggestionsContainer.style.display = 'block';
+            }
+
+            // Show the results wrapper and disclaimer
+            optimizedResultsWrapper.style.display = 'block';
+            disclaimerContainer.style.display = 'block';
+
+        } catch (error) {
+            console.error('Error optimizing text:', error);
+            optimizedList.innerHTML = '<p class="text-danger">Sorry, an error occurred.</p>';
+            optimizedResultsWrapper.style.display = 'block';
+        } finally {
+            optimizeSpinner.style.display = 'none';
+            optimizeBtn.disabled = false;
+        }
+    });
+
+    optimizedList.addEventListener('click', function(e) {
+        if (e.target && e.target.classList.contains('copy-bullet-btn')) {
+            const textToCopy = e.target.previousElementSibling.textContent;
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                e.target.classList.remove('ri-file-copy-line');
+                e.target.classList.add('ri-check-line');
+                setTimeout(() => {
+                    e.target.classList.remove('ri-check-line');
+                    e.target.classList.add('ri-file-copy-line');
+                }, 2000);
+            });
+        }
+    });
+
+
+    // --- Keyword Generator Logic ---
+    const getKeywordsBtn = document.getElementById('get-keywords-btn');
+    const keywordsResultContainer = document.getElementById('keywords-result-container');
+    const keywordsList = document.getElementById('keywords-list');
+    const copyKeywordsBtn = document.getElementById('copy-keywords-btn');
+    const keywordsSpinner = getKeywordsBtn.querySelector('.spinner-border');
+
+    getKeywordsBtn.addEventListener('click', async function() {
+        const selectedCareer = careerSelect.value;
+        if (!selectedCareer || careerSelect.selectedIndex === 0) {
+            alert('Please select a career first.');
+            return;
+        }
+
+        keywordsSpinner.style.display = 'inline-block';
+        getKeywordsBtn.disabled = true;
+        keywordsResultContainer.style.display = 'none';
+        keywordsList.innerHTML = '';
+
+        try {
+            const response = await fetch("{% url 'apps:api.get_resume_keywords' %}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify({ career: selectedCareer })
+            });
+            if (!response.ok) throw new Error('Network response was not ok.');
+            const data = await response.json();
+
+            if (data.keywords && data.keywords.length > 0) {
+                data.keywords.forEach(keyword => {
+                    const bubble = document.createElement('span');
+                    bubble.className = 'keyword-bubble';
+                    bubble.textContent = keyword;
+                    keywordsList.appendChild(bubble);
+                });
+                keywordsResultContainer.style.display = 'block';
+            }
+        } catch (error) {
+            console.error('Error fetching keywords:', error);
+            keywordsList.innerHTML = '<p class="text-danger">Sorry, an error occurred while generating keywords.</p>';
+            keywordsResultContainer.style.display = 'block';
+        } finally {
+            keywordsSpinner.style.display = 'none';
+            getKeywordsBtn.disabled = false;
+        }
+    });
+
+    copyKeywordsBtn.addEventListener('click', function() {
+        const keywords = Array.from(keywordsList.querySelectorAll('.keyword-bubble')).map(el => el.textContent);
+        const textToCopy = keywords.join(', ');
+        navigator.clipboard.writeText(textToCopy).then(() => {
+            copyKeywordsBtn.innerHTML = '<i class="ri-check-line align-middle me-1"></i> Copied!';
+            setTimeout(() => {
+                copyKeywordsBtn.innerHTML = '<i class="ri-file-copy-line align-middle me-1"></i> Copy All';
+            }, 2000);
+        });
+    });
+});
+</script>
+{% endblock extra_js %}

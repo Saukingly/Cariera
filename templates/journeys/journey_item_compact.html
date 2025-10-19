@@ -1,0 +1,39 @@
+<a href="{% if journey %}{% url 'apps:career_coach.chat' journey_id=journey.id %}{% else %}#__journey_chat_url__{% endif %}"
+   class="list-group-item list-group-item-action d-flex align-items-center"
+   data-journey-id="{% if journey %}{{ journey.id }}{% else %}__journey_id__{% endif %}"
+   data-journey-title="{% if journey %}{{ journey.title }}{% else %}__journey_title__{% endif %}"
+   data-journey-updated-at="{% if journey %}{{ journey.updated_at|timesince }} ago{% else %}__journey_updated_at__{% endif %}"
+   data-journey-last-message="{% if journey.messages.all.last %}{{ journey.messages.all.last.message|truncatechars:80 }}{% else %}__journey_last_message__{% endif %}"
+   data-journey-chat-url="{% if journey %}{% url 'apps:career_coach.chat' journey_id=journey.id %}{% else %}__journey_chat_url__{% endif %}"
+   data-journey-rename-url="{% if journey %}{% url 'apps:journeys.rename' journey.id %}{% else %}__journey_rename_url__{% endif %}"
+   data-journey-delete-url="{% if journey %}{% url 'apps:journeys.delete' journey.id %}{% else %}__journey_delete_url__{% endif %}">
+
+    {% if newly_auto_added_journey_id and journey.id|stringformat:"s" == newly_auto_added_journey_id %}
+        <span class="sparkle-dot" title="Automatically added to this folder"></span>
+    {% endif %}
+
+    <div class="flex-grow-1 {% if newly_auto_added_journey_id and journey.id|stringformat:"s" == newly_auto_added_journey_id %}ms-3{% endif %}">
+        <div class="text-body">
+            <i class="ri-discuss-line me-2"></i> {% if journey %}{{ journey.title }}{% else %}__journey_title__{% endif %}
+        </div>
+        <div class="d-block text-muted fs-12">Updated {% if journey %}{{ journey.updated_at|timesince }} ago{% else %}__journey_updated_at__{% endif %}</div>
+    </div>
+    <div class="flex-shrink-0">
+        <div class="dropdown">
+            <button class="btn btn-ghost-secondary btn-sm icon-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false" onclick="event.stopPropagation(); event.preventDefault();">
+                <i class="ri-more-2-fill"></i>
+            </button>
+            <ul class="dropdown-menu">
+                <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#renameJourneyModal" data-journey-id="{% if journey %}{{ journey.id }}{% else %}__journey_id__{% endif %}" data-journey-title="{% if journey %}{{ journey.title }}{% else %}__journey_title__{% endif %}"><i class="ri-pencil-line align-bottom me-2 text-muted"></i> Rename</button></li>
+                <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#moveToFolderModal" data-journey-id="{% if journey %}{{ journey.id }}{% else %}__journey_id__{% endif %}" data-journey-title="{% if journey %}{{ journey.title }}{% else %}__journey_title__{% endif %}"><i class="ri-folder-transfer-line align-bottom me-2 text-muted"></i> Move...</button></li>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                    <form action="{% if journey %}{% url 'apps:journeys.delete' journey.id %}{% else %}__journey_delete_url__{% endif %}" method="post" onsubmit="return confirm('Are you sure you want to permanently delete this journey?');">
+                        {% csrf_token %}
+                        <button type="submit" class="dropdown-item text-danger"><i class="ri-delete-bin-line align-bottom me-2 text-danger"></i> Delete</button>
+                    </form>
+                </li>
+            </ul>
+        </div>
+    </div>
+</a>

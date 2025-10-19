@@ -1,0 +1,159 @@
+{% extends "partials/base.html" %}
+{% load static %}
+{% block title %}Action Plan: {{ action_plan.career.name }}{% endblock title %}
+
+{% block extra_css %}
+<style>
+    .job-board-wrapper { display: flex; gap: 1.5rem; }
+    .job-list-column { flex: 0 0 380px; }
+    .job-detail-column { flex: 1; }
+    .job-list-card { max-height: 75vh; overflow-y: auto; }
+    .job-item { cursor: pointer; border-left: 3px solid transparent; transition: all 0.2s ease; }
+    .job-item.active, .job-item:hover { background-color: var(--vz-light); border-left-color: var(--vz-primary); }
+    .job-detail-placeholder { display: flex; flex-direction: column; align-items-center; justify-content: center; height: 100%; text-align: center; border-radius: .625rem; background-color: var(--vz-light); }
+    .job-detail-content { display: none; }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="main-content">
+    <div class="page-content">
+        <div class="container-fluid">
+            <!-- start page title -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="page-title-box d-sm-flex align-items-center justify-content-between">
+                        <h4 class="mb-sm-0">Action Plan: {{ action_plan.career.name }}</h4>
+                        <div class="page-title-right">
+                            <button id="findOpportunitiesBtn" class="btn btn-primary">
+                                <i class="ri-search-eye-line align-bottom me-1"></i> Find Live Opportunities
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- end page title -->
+
+            <div class="job-board-wrapper">
+                <!-- Left Column: Job List -->
+                <div class="job-list-column">
+                    <div class="card job-list-card">
+                        <div class="card-body" id="job-list-container">
+                            {% for op in opportunities %}
+                                {% include 'plans/opportunity_item.html' with op=op %}
+                            {% empty %}
+                                <p id="no-opportunities-message" class="text-muted text-center p-3">Click the button above to find live opportunities with your AI Agent.</p>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Job Detail -->
+                <div class="job-detail-column">
+                    <div class="card" style="height: 100%;">
+                        <div class="card-body">
+                            <div id="job-detail-placeholder" class="job-detail-placeholder">
+                                <i class="ri-file-list-3-line display-4 text-muted"></i>
+                                <h5 class="mt-3">Select an Opportunity</h5>
+                                <p class="text-muted">Select an item from the list to see its details here.</p>
+                            </div>
+                            <div id="job-detail-content" class="job-detail-content">
+                                <!-- Details will be populated by JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% include "partials/footer.html" %}
+</div>
+
+<!-- Hidden template for new list items -->
+<template id="opportunity-item-template">
+    {% include 'plans/opportunity_item.html' %}
+</template>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const jobListContainer = document.getElementById('job-list-container');
+    const detailPlaceholder = document.getElementById('job-detail-placeholder');
+    const detailContent = document.getElementById('job-detail-content');
+    const findBtn = document.getElementById('findOpportunitiesBtn');
+    const noOpsMessage = document.getElementById('no-opportunities-message');
+    const careerId = "{{ action_plan.career.id }}";
+    const csrfToken = "{{ csrf_token }}";
+
+    function showDetails(element) {
+        document.querySelectorAll('.job-item').forEach(item => item.classList.remove('active'));
+        element.classList.add('active');
+        const data = element.dataset;
+
+        detailContent.innerHTML = `
+            <h5>${data.title}</h5>
+            <p class="text-muted mb-1">${data.organization} - ${data.location}</p>
+            <span class="badge bg-primary-subtle text-primary-emphasis">${data.type}</span>
+            <hr>
+            <p>${data.description}</p>
+            <a href="${data.url}" class="btn btn-soft-primary" target="_blank">View Source</a>
+        `;
+
+        detailPlaceholder.style.display = 'none';
+        detailContent.style.display = 'block';
+    }
+
+    jobListContainer.addEventListener('click', function(e) {
+        const jobItem = e.target.closest('.job-item');
+        if (jobItem) {
+            showDetails(jobItem);
+        }
+    });
+
+    findBtn.addEventListener('click', function() {
+        findBtn.disabled = true;
+        findBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Searching...';
+        jobListContainer.innerHTML = '<div class="text-center p-5"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">AI Agent at work...</p></div>';
+
+        fetch("{% url 'apps:api.find_opportunities' %}", {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+            body: JSON.stringify({ career_id: careerId })
+        })
+        .then(response => response.json())
+        .then(data => {
+            jobListContainer.innerHTML = '';
+            if (data.status === 'success' && data.opportunities.length > 0) {
+                data.opportunities.forEach(op => {
+                    const template = document.getElementById('opportunity-item-template');
+                    const clone = template.content.cloneNode(true);
+                    const item = clone.querySelector('.job-item');
+                    item.dataset.title = op.title;
+                    item.dataset.organization = op.organization;
+                    item.dataset.location = op.location;
+                    item.dataset.type = op.type;
+                    item.dataset.description = op.description;
+                    item.dataset.url = op.url;
+                    clone.querySelector('.item-title').textContent = op.title;
+                    clone.querySelector('.item-org').textContent = op.organization;
+                    clone.querySelector('.item-loc').textContent = op.location;
+                    clone.querySelector('.item-type').textContent = op.type;
+                    jobListContainer.appendChild(clone);
+                });
+            } else {
+                jobListContainer.innerHTML = '<p class="text-muted text-center p-3">The AI Agent could not find any live opportunities at this time.</p>';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            jobListContainer.innerHTML = '<p class="text-danger text-center p-3">An error occurred. Please try again.</p>';
+        })
+        .finally(() => {
+            findBtn.disabled = false;
+            findBtn.innerHTML = '<i class="ri-search-eye-line align-bottom me-1"></i> Find Live Opportunities';
+        });
+    });
+});
+</script>
+{% endblock extra_js %}

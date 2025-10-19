@@ -1,0 +1,169 @@
+{% extends "partials/base.html" %}
+{% load static %}
+
+{% block title %}Interview Progress{% endblock title %}
+
+{% block extra_css %}
+<style>
+    .chart-card-body {
+        position: relative;
+        height: 350px;
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="main-content">
+    <div class="page-content">
+        <div class="container-fluid">
+            <!-- Page Title -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="page-title-box d-sm-flex align-items-center justify-content-between">
+                        <h4 class="mb-sm-0">INTERVIEW PROGRESS</h4>
+                        <div class="page-title-right">
+                            <ol class="breadcrumb m-0">
+                                <li class="breadcrumb-item"><a href="{% url 'apps:interview.setup' %}">Interview Practice</a></li>
+                                <li class="breadcrumb-item active">Progress</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% if total_interviews > 0 %}
+            {% if ai_insights %}
+            <div class="row">
+                <div class="col-12">
+                    <div class="card bg-primary-subtle text-primary border-0">
+                        <div class="card-body d-flex align-items-center">
+                            <div class="flex-shrink-0">
+                                <i class="ri-lightbulb-flash-line fs-3"></i>
+                            </div>
+                            <div class="flex-grow-1 ms-3">
+                                <h5 class="card-title">Coach's Insight</h5>
+                                <p class="mb-0">{{ ai_insights }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="row">
+                <div class="col-lg-4">
+                    <div class="card card-height-100">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Latest Interview Snapshot</h5>
+                        </div>
+                        <div class="card-body chart-card-body d-flex flex-column justify-content-center">
+                            {% if latest_interview %}
+                            <p class="text-muted text-center mb-2">Scores for: {{ latest_interview.title }}</p>
+                            <canvas id="radarChart"></canvas>
+                            {% else %}
+                            <p class="text-muted text-center">No completed interviews with results found.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-8">
+                    <div class="card card-height-100">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Historical Performance</h5>
+                        </div>
+                        <div class="card-body chart-card-body">
+                             <canvas id="lineChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-body text-center py-5">
+                            <i class="ri-line-chart-line display-4 text-muted"></i>
+                            <h4 class="mt-3">No Data Yet</h4>
+                            <p class="text-muted">You need to complete at least one interview to see your progress chart.</p>
+                            <a href="{% url 'apps:interview.setup' %}" class="btn btn-primary mt-2">Start Your First Interview</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+        </div>
+    </div>
+    {% include "partials/footer.html" %}
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const lineChartDataEl = '{{ line_chart_data_json|safe }}';
+    const radarChartDataEl = '{{ radar_chart_data_json|safe }}';
+    const lineCtx = document.getElementById('lineChart');
+    const radarCtx = document.getElementById('radarChart');
+
+    if (lineCtx && lineChartDataEl) {
+        try {
+            const lineChartData = JSON.parse(lineChartDataEl);
+            if (lineChartData.labels && lineChartData.labels.length > 0) {
+                new Chart(lineCtx, {
+                    type: 'line',
+                    data: {
+                        labels: lineChartData.labels,
+                        datasets: [
+                            { label: 'Overall Score', data: lineChartData.overall, borderColor: 'rgb(75, 192, 192)', tension: 0.1, fill: false },
+                            { label: 'Confidence', data: lineChartData.confidence, borderColor: 'rgb(255, 99, 132)', tension: 0.1, fill: false },
+                            { label: 'Clarity', data: lineChartData.clarity, borderColor: 'rgb(54, 162, 235)', tension: 0.1, fill: false },
+                            // --- FIX: Use the correct data key from the view ---
+                            { label: 'Camera Presence', data: lineChartData.camera_presence, borderColor: 'rgb(255, 205, 86)', tension: 0.1, fill: false }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'top' } },
+                        scales: { y: { min: 0, max: 100 } }
+                    }
+                });
+            }
+        } catch (e) { console.error("Failed to render line chart:", e); }
+    }
+
+    if (radarCtx && radarChartDataEl) {
+        try {
+            const radarChartData = JSON.parse(radarChartDataEl);
+            if (radarChartData) {
+                new Chart(radarCtx, {
+                    type: 'radar',
+                    data: {
+                        // --- FIX: Use the correct label ---
+                        labels: ['Overall Score', 'Confidence', 'Clarity', 'Camera Presence'],
+                        datasets: [{
+                            label: 'Scores',
+                            // --- FIX: Use the correct data key from the view ---
+                            data: [radarChartData.overall, radarChartData.confidence, radarChartData.clarity, radarChartData.camera_presence],
+                            fill: true,
+                            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                            borderColor: 'rgb(54, 162, 235)',
+                            pointBackgroundColor: 'rgb(54, 162, 235)',
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: { r: { angleLines: { display: true }, suggestedMin: 0, suggestedMax: 100, pointLabels: { font: { size: 12 } } } }
+                    }
+                });
+            }
+        } catch (e) { console.error("Failed to render radar chart:", e); }
+    }
+});
+</script>
+{% endblock extra_js %}

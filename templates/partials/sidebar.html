@@ -1,0 +1,222 @@
+{% load static %}
+{% block sidebar %}
+<style>
+/* Horizontal Sidebar Optimization - Keep Original Layout */
+/* Keep navbar items in a single tidy line */
+.navbar-nav {
+    display: flex !important;
+    flex-wrap: nowrap !important;   /* Prevent wrapping */
+    overflow-x: auto;               /* Allow horizontal scroll if needed */
+    white-space: nowrap;            /* Keep text in one line */
+    -webkit-overflow-scrolling: touch; /* Smooth scroll on mobile */
+}
+
+/* Prevent items from shrinking awkwardly */
+.navbar-nav .nav-item {
+    flex: 0 0 auto;
+}
+
+/* Optional: Hide scrollbar but keep scrolling */
+.navbar-nav::-webkit-scrollbar {
+    display: none;
+}
+.navbar-nav .nav-link {
+    padding: 0.9rem 1rem !important;
+    white-space: nowrap;
+    font-size: 0.95rem !important;  /* Slightly bigger */
+    font-weight: 500;              /* Neater look */
+    display: flex;
+    align-items: center;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.navbar-nav .nav-link i {
+    margin-right: 6px;
+    font-size: 16px; /* Bigger icons */
+    width: 18px;
+    text-align: center;
+}
+
+.navbar-nav .nav-link span {
+    font-size: 0.9rem;  /* Bigger text */
+    font-weight: 500;
+}
+
+.menu-title {
+    margin: 0 0.75rem 0 0.5rem !important;
+    padding: 0 !important;
+}
+
+.menu-title span {
+    font-size: 0.8rem !important;  /* Slightly larger */
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #8b949e;
+    white-space: nowrap;
+}
+
+.navbar-nav .nav-link:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    transform: translateY(-1px);
+}
+
+/* External link indicator */
+.navbar-nav .nav-link[target="_blank"]::after {
+    content: "↗";
+    margin-left: 4px;
+    font-size: 0.65rem;
+    opacity: 0.7;
+}
+
+/* Mobile responsive - stack items better */
+@media (max-width: 1200px) {
+    .navbar-nav .nav-link span {
+        font-size: 0.85rem;
+    }
+
+    .navbar-nav .nav-link {
+        padding: 0.4rem 0.8rem !important;
+    }
+}
+
+@media (max-width: 900px) {
+    .navbar-nav .nav-link span {
+        display: none; /* Hide text on smaller screens */
+    }
+
+    .navbar-nav .nav-link i {
+        margin-right: 0;
+    }
+
+    .navbar-nav .nav-link {
+        padding: 0.5rem !important;
+        min-width: 36px;
+        justify-content: center;
+    }
+}
+</style>
+
+<!-- ========== App Menu ========== -->
+<div class="app-menu navbar-menu">
+    <!-- LOGO -->
+    <div class="navbar-brand-box">
+        <!-- Dark Logo-->
+        <a href="{% url 'apps:journeys.list' %}" class="logo logo-dark">
+            <span class="logo-sm">
+                <img src="{% static 'images/logo-sm.png' %}" alt="Logo" height="22">
+            </span>
+            <span class="logo-lg">
+                <img src="{% static 'images/logo-dark.png' %}" alt="Logo" height="60">
+            </span>
+        </a>
+        <!-- Light Logo-->
+        <a href="{% url 'apps:journeys.list' %}" class="logo logo-light">
+            <span class="logo-sm">
+                <img src="{% static 'images/logo-sm.png' %}" alt="Logo" height="22">
+            </span>
+            <span class="logo-lg">
+                <img src="{% static 'images/logo-light.png' %}" alt="Logo" height="60">
+            </span>
+        </a>
+        <button type="button"
+                class="btn btn-sm p-0 fs-20 header-item float-end btn-vertical-sm-hover"
+                id="vertical-hover">
+            <i class="ri-record-circle-line"></i>
+        </button>
+    </div>
+
+    <div id="scrollbar">
+        <div class="container-fluid">
+            <div id="two-column-menu"></div>
+            <ul class="navbar-nav" id="navbar-nav">
+
+                <!-- My Odyssey Section -->
+                <li class="menu-title">
+                    <span data-key="t-menu">My Odyssey</span>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link menu-link" href="{% url 'apps:journeys.list' %}">
+                        <i class="ri-robot-2-line"></i>
+                        <span data-key="t-chat">AI Career Coach</span>
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link menu-link" href="{% url 'apps:explore_careers' %}">
+                        <i class="ri-compass-3-line"></i>
+                        <span data-key="t-explore">Explore Careers</span>
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link menu-link" href="{% url 'apps:my_opportunities' %}">
+                        <i class="ri-bookmark-3-line"></i>
+                        <span data-key="t-opportunities">My Opportunities</span>
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link menu-link" href="{% url 'apps:my_action_plans' %}">
+                        <i class="ri-road-map-line"></i>
+                        <span data-key="t-plans">My Action Plans</span>
+                    </a>
+                </li>
+
+                <!-- Tools Section -->
+                <li class="menu-title">
+                    <span data-key="t-tools">Tools</span>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link menu-link" href="{% url 'apps:ats_resume_tools' %}">
+                        <i class="ri-file-search-line"></i>
+                        <span data-key="t-resume">ATS Resume Checker</span>
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link menu-link" href="{% url 'apps:whatsapp.subscribe' %}">
+                        <i class="ri-whatsapp-line"></i>
+                        <span data-key="t-whatsapp">Connect WhatsApp</span>
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <!-- THE ONLY CHANGE IS IN THIS 'href' ATTRIBUTE -->
+                    <a class="nav-link menu-link" href="{% url 'apps:interview.setup' %}">
+                        <i class="ri-mic-line"></i>
+                        <span data-key="t-interviewer">AI Interviewer</span>
+                    </a>
+                </li>
+
+                <!-- Account Section -->
+                <li class="menu-title">
+                    <i class="ri-more-fill"></i>
+                    <span data-key="t-account">Account</span>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link menu-link" href="{% url 'apps:profile' %}">
+                        <i class="ri-user-line"></i>
+                        <span data-key="t-profile">Profile</span>
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link menu-link" href="{% url 'account_logout' %}">
+                        <i class="ri-logout-box-r-line"></i>
+                        <span data-key="t-logout">Logout</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+        <!-- Sidebar -->
+    </div>
+    <div class="sidebar-background"></div>
+</div>
+<!-- Left Sidebar End -->
+<!-- Vertical Overlay -->
+<div class="vertical-overlay"></div>
+{% endblock sidebar %}

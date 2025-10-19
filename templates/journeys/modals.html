@@ -1,0 +1,98 @@
+<!-- Rename Journey Modal -->
+<div class="modal fade" id="renameJourneyModal" tabindex="-1" aria-labelledby="renameJourneyModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="renameJourneyModalLabel">Rename Journey</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="renameJourneyForm" method="post">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <label for="newTitleInput" class="form-label">New Journey Title</label>
+                    <input type="text" class="form-control" id="newTitleInput" name="new_title" required>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Create Folder Modal -->
+<div class="modal fade" id="createFolderModal" tabindex="-1" aria-labelledby="createFolderModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createFolderModalLabel">Create New Folder</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{% url 'apps:folders.new' %}" method="post">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <label for="folderNameInput" class="form-label">Folder Name</label>
+                    <input type="text" class="form-control" id="folderNameInput" name="folder_name" required>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-primary">Create Folder</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Rename Folder Modal -->
+<div class="modal fade" id="renameFolderModal" tabindex="-1" aria-labelledby="renameFolderModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="renameFolderModalLabel">Rename Folder</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="renameFolderForm" method="post">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <label for="newFolderNameInput" class="form-label">New Folder Name</label>
+                    <input type="text" class="form-control" id="newFolderNameInput" name="folder_name" required>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+
+<!-- Move to Folder Modal -->
+<div class="modal fade" id="moveToFolderModal" tabindex="-1" aria-labelledby="moveToFolderModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="moveToFolderModalLabel">Move Journey to Folder</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="moveToFolderForm" action="{% url 'apps:journeys.move_to_folder' %}" method="post">
+                {% csrf_token %}
+                <input type="hidden" name="journey_id" id="journeyIdInput">
+                <div class="modal-body">
+                    <p>Move journey "<strong id="journeyTitleText"></strong>" to:</p>
+                    <select class="form-select" name="folder_id">
+                        <option value="None">Uncategorized (Remove from folder)</option>
+                        {% for folder in folders %}
+                        <option value="{{ folder.id }}">{{ folder.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Move Journey</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

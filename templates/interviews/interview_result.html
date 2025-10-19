@@ -1,0 +1,106 @@
+{% extends "partials/base.html" %}
+{% load static %}
+
+{% block title %}Interview Results{% endblock title %}
+
+{% block content %}
+<div class="main-content">
+    <div class="page-content">
+        <div class="container-fluid">
+            <!-- Page Title -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="page-title-box d-sm-flex align-items-center justify-content-between">
+                        <h4 class="mb-sm-0">Interview Results</h4>
+                        <div class="page-title-right">
+                            <ol class="breadcrumb m-0">
+                                <li class="breadcrumb-item"><a href="{% url 'apps:interview.setup' %}">Interview Practice</a></li>
+                                <li class="breadcrumb-item active">Results</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row justify-content-center">
+                <div class="col-lg-8">
+                    <div class="card">
+                        <div class="card-body">
+                            <h4 class="card-title text-center mb-4">Feedback for: {{ session.title }}</h4>
+                            
+                            <!-- NEW: Conditional rendering based on results_ready flag -->
+                            {% if results_ready and result %}
+                                <div class="row text-center mb-4">
+                                    <div class="col-md-3">
+                                        <div class="p-3 border border-dashed rounded h-100">
+                                            <h5 class="mb-1">{{ result.overall_score }}/100</h5>
+                                            <p class="text-muted mb-0">Overall Score</p>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                         <div class="p-3 border border-dashed rounded h-100">
+            <h5 class="mb-1">{{ result.camera_presence_score }}/100</h5>
+            <p class="text-muted mb-0">Camera Presence</p>
+        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="p-3 border border-dashed rounded h-100">
+                                            <h5 class="mb-1">{{ result.confidence_score }}/100</h5>
+                                            <p class="text-muted mb-0">Confidence</p>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="p-3 border border-dashed rounded h-100">
+                                            <h5 class="mb-1">{{ result.clarity_score }}/100</h5>
+                                            <p class="text-muted mb-0">Clarity</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <hr>
+                                <div>
+                                    <h5>AI Feedback & Suggestions</h5>
+                                    <div class="text-muted">{{ result.feedback_summary|safe|linebreaksbr }}</div>
+                                </div>
+
+                                <div class="mt-4 d-flex justify-content-center gap-2">
+                                    <a href="{% url 'apps:interview.setup' %}" class="btn btn-secondary">Back to Setup</a>
+                                    <a href="{% url 'apps:interview.retry' session.id %}" class="btn btn-primary"><i class="ri-refresh-line align-middle me-1"></i> Retry with Same Settings</a>
+                                </div>
+
+                            {% else %}
+                                <!-- This block shows while waiting for results -->
+                                <div class="alert alert-info text-center">
+                                    <h5 class="alert-heading">Analyzing Your Interview...</h5>
+                                    <div class="d-flex justify-content-center mt-3">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                    </div>
+                                    <p class="mt-3 mb-0">Your results are being generated. This page will automatically refresh in a few seconds.</p>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const resultsReady = {{ results_ready|yesno:"true,false" }};
+
+    if (!resultsReady) {
+        console.log("Results not ready. Starting to poll every 5 seconds...");
+        setTimeout(function() {
+            window.location.reload();
+        }, 5000); // Reload the page after 5 seconds
+    } else {
+        console.log("Results are ready. Displaying report.");
+    }
+});
+</script>
+{% endblock extra_js %}

@@ -1,0 +1,28 @@
+<div class="card">
+    <div class="card-body">
+        <div class="d-flex align-items-start mb-2">
+            <div class="flex-grow-1">
+                <h5 class="card-title mb-0">{% if journey %}{{ journey.title }}{% else %}__journey_title__{% endif %}</h5>
+            </div>
+            <div class="flex-shrink-0">
+                <div class="dropdown">
+                    <a href="#" class="btn btn-ghost-secondary btn-sm icon-btn" data-bs-toggle="dropdown" aria-expanded="false"><i class="ri-more-2-fill"></i></a>
+                    <ul class="dropdown-menu">
+                        <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#renameJourneyModal" data-journey-id="{% if journey %}{{ journey.id }}{% else %}__journey_id__{% endif %}" data-journey-title="{% if journey %}{{ journey.title }}{% else %}__journey_title__{% endif %}"><i class="ri-pencil-line align-bottom me-2 text-muted"></i> Rename</button></li>
+                        <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#moveToFolderModal" data-journey-id="{% if journey %}{{ journey.id }}{% else %}__journey_id__{% endif %}" data-journey-title="{% if journey %}{{ journey.title }}{% else %}__journey_title__{% endif %}"><i class="ri-folder-transfer-line align-bottom me-2 text-muted"></i> Move...</button></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <form action="{% if journey %}{% url 'apps:journeys.delete' journey.id %}{% else %}__journey_delete_url__{% endif %}" method="post" onsubmit="return confirm('Delete this journey?');">
+                                {% csrf_token %}
+                                <button type="submit" class="dropdown-item text-danger"><i class="ri-delete-bin-line align-bottom me-2 text-danger"></i> Delete</button>
+                            </form>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <p class="text-muted">Last activity: {% if journey %}{{ journey.updated_at|timesince }} ago{% else %}__journey_updated_at__{% endif %}</p>
+        <p class="card-text text-muted">{% if journey %}"{{ journey.messages.all.last.message|truncatechars:80 }}"{% else %}__journey_last_message__{% endif %}</p>
+        <a href="{% if journey %}{% url 'apps:career_coach.chat' journey_id=journey.id %}{% else %}__journey_chat_url__{% endif %}" class="btn btn-primary">Continue Journey</a>
+    </div>
+</div>

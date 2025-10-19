@@ -1,0 +1,14 @@
+<div class="job-item p-3 border-bottom"
+     data-title="{{ op.title|default:'__title__' }}"
+     data-organization="{{ op.organization_name|default:'__org__' }}"
+     data-location="{{ op.location|default:'__loc__' }}"
+     data-type="{{ op.get_opportunity_type_display|default:'__type__' }}"
+     data-description="{{ op.description|escapejs }}"
+     data-url="{{ op.source_url|default:'#' }}">
+    <h6 class="item-title mb-1">{{ op.title|default:'Opportunity Title' }}</h6>
+    <p class="text-muted mb-1 fs-13">
+        <span class="item-org">{{ op.organization_name|default:'Organization' }}</span>
+        - <span class="item-loc">{{ op.location|default:'Location' }}</span>
+    </p>
+    <span class="badge bg-primary-subtle text-primary-emphasis item-type">{{ op.get_opportunity_type_display|default:'Type' }}</span>
+</div>

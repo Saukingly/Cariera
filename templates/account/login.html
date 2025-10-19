@@ -1,0 +1,66 @@
+{% extends 'account/base.html' %}
+{% load i18n %}
+{% load static %}
+{% load socialaccount %}
+
+{% block title %}Sign In{% endblock title %}
+
+{% block content %}
+<div class="p-lg-5 p-4">
+    <div>
+        <h5 class="text-primary">Welcome Back!</h5>
+        <p class="text-muted">Sign in to continue to Odyssey.ai.</p>
+    </div>
+
+    <div class="mt-4">
+        <form class="needs-validation" novalidate method="POST" action="{% url 'account_login' %}">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger mb-3 text-center" role="alert">
+                    {% for error in form.non_field_errors %}
+                        {{ error }}
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <div class="mb-3">
+                <label for="id_login" class="form-label">Username or Email</label>
+                <input type="text" name="login" id="id_login" class="form-control {% if form.login.errors %}is-invalid{% endif %}" placeholder="Enter username or email" required>
+                {% for error in form.login.errors %}
+                    <div class="invalid-feedback">{{ error }}</div>
+                {% endfor %}
+            </div>
+
+            <div class="mb-3">
+                <div class="float-end">
+                    <a href="{% url 'account_reset_password' %}" class="text-muted">Forgot password?</a>
+                </div>
+                <label class="form-label" for="id_password">Password</label>
+                <div class="position-relative auth-pass-inputgroup">
+                    <input type="password" name="password" class="form-control pe-5 password-input {% if form.password.errors %}is-invalid{% endif %}" placeholder="Enter password" id="id_password" required>
+                    <button class="btn btn-link position-absolute end-0 top-0 text-decoration-none text-muted password-addon" type="button"><i class="ri-eye-fill align-middle"></i></button>
+                    {% for error in form.password.errors %}
+                        <div class="invalid-feedback">{{ error }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="remember" id="id_remember">
+                <label class="form-check-label" for="id_remember">Remember me</label>
+            </div>
+
+            <div class="mt-4">
+                <button class="btn btn-success w-100" type="submit">Sign In</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+    {{ block.super }}
+    <!-- password-addon init -->
+    <script src="{% static 'js/pages/password-addon.init.js'%}"></script>
+{% endblock extra_js %}

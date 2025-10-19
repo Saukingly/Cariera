@@ -1,0 +1,266 @@
+{% extends "partials/base.html" %}
+{% load static %}
+{% block title %}My Profile{% endblock title %}
+
+{% block extra_css %}
+    <style>
+        /* Styles for the personality test modal */
+        #personalityTestModal .modal-content {
+            background-color: #2c3e50; color: #ecf0f1; border: none; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+        }
+        #personalityTestModal .modal-header { border-bottom: 1px solid #34495e; }
+        #personalityTestModal .btn-close { filter: invert(1); }
+        .progress-bar-container { width: 100%; background-color: #34495e; border-radius: 10px; margin-bottom: 2rem; }
+        #testProgressBar {
+            height: 15px; background: linear-gradient(90deg, #1abc9c, #3498db); width: 0%; border-radius: 10px;
+            transition: width 0.5s ease-in-out; text-align: center; color: white; font-weight: bold;
+        }
+        #testQuestionText { font-size: 1.5rem; font-weight: 500; margin-bottom: 2rem; text-align: center; }
+        .choice-btn {
+            display: block; width: 100%; margin-bottom: 1rem; padding: 1rem; background-color: #34495e;
+            border: 2px solid transparent; color: #ecf0f1; border-radius: 8px; transition: all 0.3s ease;
+        }
+        .choice-btn:hover { background-color: #4a627a; border-color: #1abc9c; }
+        .choice-btn.selected { background-color: #1abc9c; border-color: #16a085; color: white; font-weight: bold; }
+        .stars-container { position: fixed; top: 0; left: 0; pointer-events: none; z-index: 1060; width: 100vw; height: 100vh; overflow: hidden; }
+        .star {
+            position: absolute; width: 4px; height: 4px; background: #fff; border-radius: 50%;
+            box-shadow: 0 0 6px #fff; animation: explode 0.8s ease-out forwards;
+        }
+        @keyframes explode { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(3); opacity: 0; } }
+        #testResultView { text-align: center; }
+        #resultIcon { font-size: 5rem; color: #1abc9c; animation: bounceIn 1s; }
+        @keyframes bounceIn { 0%, 20%, 40%, 60%, 80%, 100% {transition-timing-function: cubic-bezier(0.215, 0.610, 0.355, 1.000);} 0% {opacity: 0;transform: scale3d(.3, .3, .3);} 20% {transform: scale3d(1.1, 1.1, 1.1);} 40% {transform: scale3d(.9, .9, .9);} 60% {opacity: 1;transform: scale3d(1.03, 1.03, 1.03);} 80% {transform: scale3d(.97, .97, .97);} 100% {opacity: 1;transform: scale3d(1, 1, 1);} }
+    </style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="main-content">
+    <div class="page-content">
+        <div class="container-fluid">
+            <!-- page title -->
+            <div class="row"><div class="col-12"><div class="page-title-box d-sm-flex align-items-center justify-content-between"><h4 class="mb-sm-0">Profile</h4><div class="page-title-right"><ol class="breadcrumb m-0"><li class="breadcrumb-item">Account</li><li class="breadcrumb-item active">Profile</li></ol></div></div></div></div>
+
+            {% if messages %}{% for message in messages %}<div class="alert {% if message.tags == 'success' %}alert-success{% else %}alert-danger{% endif %} alert-dismissible fade show" role="alert">{{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>{% endfor %}{% endif %}
+
+            <div class="row">
+                <div class="col-lg-12">
+                    <div class="card">
+                        <div class="card-body">
+                            <form method="post" enctype="multipart/form-data">
+                                {% csrf_token %}
+                                <div class="row align-items-center">
+                                    <div class="col-md-3 text-center">
+                                        {% if user.profile.avatar and user.profile.avatar.url != '/media/avatars/default.jpg' %}<img src="{{ user.profile.avatar.url }}" alt="avatar" class="rounded-circle avatar-xl img-thumbnail mb-3">{% else %}<div class="avatar-xl mx-auto mb-3"><span class="avatar-title rounded-circle bg-primary-subtle text-primary display-4">{{ user.username.0|upper }}</span></div>{% endif %}
+                                        <div class="mb-3"><label for="{{ profile_form.avatar.id_for_label }}" class="form-label">Change Picture</label>{{ profile_form.avatar }}</div>
+                                    </div>
+                                    <div class="col-md-9"><div class="row"><div class="col-md-6 mb-3"><label for="{{ user_form.first_name.id_for_label }}" class="form-label">First Name</label>{{ user_form.first_name }}</div><div class="col-md-6 mb-3"><label for="{{ user_form.last_name.id_for_label }}" class="form-label">Last Name</label>{{ user_form.last_name }}</div><div class="col-md-12 mb-3"><label for="{{ user_form.email.id_for_label }}" class="form-label">Email Address</label>{{ user_form.email }}</div><div class="col-md-12 mb-3"><strong>Career Personality Type:</strong>{% if user.profile.personality_type %}<span class="badge bg-success fs-13">{{ user.profile.personality_type }}</span>{% else %}<span class="badge bg-warning-subtle text-warning fs-13">Not yet assessed</span>{% endif %}</div><div class="col-12"><div class="hstack gap-2 justify-content-end"><button type="submit" class="btn btn-primary">Update Profile</button></div></div></div></div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+             <div class="row">
+                <div class="col-lg-12">
+                    <div class="card">
+                        <div class="card-header"><h5 class="card-title mb-0">Personality Assessment</h5></div>
+                        <div class="card-body">
+                            <p class="text-muted mb-0">Your career personality type helps us recommend the best career paths for you. If you haven't taken the assessment yet, or want to retake it, you can start here.</p>
+                             <button type="button" class="btn btn-secondary mt-3 start-personality-test-btn" data-is-retake="{% if user.profile.personality_type %}true{% else %}false{% endif %}">
+                                <i class="ri-user-voice-line align-middle"></i>
+                                {% if user.profile.personality_type %}Retake the Assessment{% else %}Take the Career Personality Assessment{% endif %}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Personality Test Modal -->
+<div class="modal fade" id="personalityTestModal" tabindex="-1" aria-labelledby="personalityTestModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="personalityTestModalLabel">Career Personality Assessment</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div id="testLoadingView" class="text-center"><div class="spinner-border text-light" role="status"><span class="visually-hidden">Loading...</span></div><p class="mt-2">Loading your assessment...</p></div>
+                <div id="testQuestionView" style="display: none;"><div class="progress-bar-container"><div id="testProgressBar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div></div><h3 id="testQuestionText"></h3><div id="testChoicesContainer" class="mt-4"></div></div>
+                <div id="testResultView" style="display: none;"><div id="resultIcon"><i class="ri-award-fill"></i></div><h2 class="mt-3">Assessment Complete!</h2><h4 class="text-muted">Your primary career personality type is:</h4><h1 id="primaryPersonalityType" class="display-4" style="color: #1abc9c;"></h1><p id="personalityResultCode" class="mt-2 fs-5"></p><p>Your profile has been updated! This will help tailor your career suggestions.</p><button id="resultCloseBtn" class="btn btn-success mt-3" data-bs-dismiss="modal">Close</button></div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="stars-container"></div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const modalElement = document.getElementById('personalityTestModal');
+    if (!modalElement) return;
+
+    const testModal = new bootstrap.Modal(modalElement);
+    const startBtn = document.querySelector('.start-personality-test-btn');
+
+    const loadingView = document.getElementById('testLoadingView');
+    const questionView = document.getElementById('testQuestionView');
+    const resultView = document.getElementById('testResultView');
+    const questionTextElem = document.getElementById('testQuestionText');
+    const choicesContainer = document.getElementById('testChoicesContainer');
+    const progressBar = document.getElementById('testProgressBar');
+
+    let currentQuestion = null;
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    const csrftoken = getCookie('csrftoken');
+
+    if (startBtn) {
+        startBtn.addEventListener('click', async () => {
+            const isRetake = startBtn.dataset.isRetake === 'true';
+            showView('loading');
+            testModal.show();
+            if (isRetake) {
+                try {
+                    const response = await fetch("{% url 'apps:personality_test.reset' %}", {
+                        method: 'POST',
+                        headers: { 'X-CSRFToken': csrftoken, 'Content-Type': 'application/json' }
+                    });
+                    if (!response.ok) throw new Error('Failed to reset progress on server.');
+                    await fetchNextQuestion();
+                } catch (error) {
+                    console.error('Error resetting test progress:', error);
+                    alert('Could not restart the assessment. Please try again.');
+                    testModal.hide();
+                }
+            } else {
+                await fetchNextQuestion();
+            }
+        });
+    }
+
+    modalElement.addEventListener('hidden.bs.modal', () => {
+        if (resultView.style.display === 'block') {
+            window.location.reload();
+        }
+    });
+
+    function showView(viewName) {
+        ['loading', 'question', 'result'].forEach(v => {
+            document.getElementById(`test${v.charAt(0).toUpperCase() + v.slice(1)}View`).style.display = v === viewName ? 'block' : 'none';
+        });
+    }
+
+    async function fetchNextQuestion() {
+        try {
+            const response = await fetch("{% url 'apps:personality_test.get_question' %}");
+            if (!response.ok) throw new Error('Network error fetching question.');
+            const data = await response.json();
+            if (data.status === 'complete') {
+                await finishTest();
+            } else {
+                renderQuestion(data);
+                showView('question');
+            }
+        } catch (error) {
+            console.error('Error fetching question:', error);
+            alert('An error occurred. Please try again.');
+            testModal.hide();
+        }
+    }
+
+    function renderQuestion(data) {
+        questionTextElem.textContent = data.question_text;
+        choicesContainer.innerHTML = '';
+        data.choices.forEach(choice => {
+            const button = document.createElement('button');
+            button.className = 'btn choice-btn';
+            button.textContent = choice.text;
+            button.dataset.choiceId = choice.id;
+            button.onclick = () => selectChoice(button, data.question_id, choice.id);
+            choicesContainer.appendChild(button);
+        });
+        const progressPercentage = (data.progress.current / data.progress.total) * 100;
+        progressBar.style.width = `${progressPercentage}%`;
+        progressBar.textContent = `${data.progress.current} / ${data.progress.total}`;
+    }
+
+    function selectChoice(selectedButton, questionId, choiceId) {
+        choicesContainer.querySelectorAll('.choice-btn').forEach(btn => btn.disabled = true);
+        setTimeout(() => submitAnswer(questionId, choiceId), 300);
+    }
+
+    async function submitAnswer(questionId, choiceId) {
+        try {
+            await fetch("{% url 'apps:personality_test.submit_answer' %}", {
+                method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+                body: JSON.stringify({ question_id: questionId, choice_id: choiceId })
+            });
+            await fetchNextQuestion();
+        } catch (error) {
+            console.error('Error submitting answer:', error);
+            choicesContainer.querySelectorAll('.choice-btn').forEach(btn => btn.disabled = false);
+        }
+    }
+
+    async function finishTest() {
+        showView('loading');
+        try {
+            const response = await fetch("{% url 'apps:personality_test.calculate_result' %}");
+            if (!response.ok) throw new Error('Server error calculating results.');
+            const data = await response.json();
+            if (data.status === 'success') {
+                displayResults(data);
+                triggerStarExplosion();
+            } else {
+                throw new Error(data.message || 'Could not calculate results.');
+            }
+        } catch (error) {
+            console.error('Error finishing test:', error);
+            alert(`Error: ${error.message}. Please try retaking the assessment.`);
+            testModal.hide();
+        }
+    }
+
+    function displayResults(data) {
+        document.getElementById('primaryPersonalityType').textContent = data.primary_type;
+        document.getElementById('personalityResultCode').textContent = `Your full code is: ${data.result_code}`;
+        showView('result');
+    }
+
+    function triggerStarExplosion() {
+        const container = document.querySelector('.stars-container');
+        if (!container) return;
+        container.innerHTML = '';
+        for (let i = 0; i < 50; i++) {
+            const star = document.createElement('div');
+            star.className = 'star';
+            const angle = Math.random() * 2 * Math.PI;
+            const radius = Math.random() * (Math.min(window.innerWidth, window.innerHeight) / 2.5);
+            star.style.left = '50%';
+            star.style.top = '50%';
+            star.style.transform = `translate(${Math.cos(angle) * radius}px, ${Math.sin(angle) * radius}px)`;
+            container.appendChild(star);
+        }
+        setTimeout(() => container.innerHTML = '', 1000);
+    }
+});
+</script>
+{% endblock extra_js %}

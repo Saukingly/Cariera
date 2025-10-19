@@ -1,0 +1,287 @@
+{% extends "partials/base.html" %}
+{% load static %}
+{% block title %}Roadmap: {{ action_plan.career.name }}{% endblock title %}
+
+{% block extra_css %}
+<style>
+    .roadmap-wrapper {
+        position: relative;
+        padding: 2rem 0;
+    }
+    .roadmap-line {
+        position: absolute;
+        left: 50%;
+        top: 0;
+        bottom: 0;
+        width: 4px;
+        background-color: var(--vz-border-color);
+        transform: translateX(-50%);
+    }
+    .roadmap-item {
+        position: relative;
+        margin-bottom: 50px;
+        width: 50%;
+    }
+    .roadmap-item:nth-child(odd) {
+        left: 0;
+        padding-right: 50px;
+        text-align: right;
+    }
+    .roadmap-item:nth-child(even) {
+        left: 50%;
+        padding-left: 50px;
+        text-align: left;
+    }
+    .roadmap-icon {
+        position: absolute;
+        top: 0;
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background-color: var(--vz-card-bg);
+        border: 4px solid var(--vz-primary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        color: var(--vz-primary);
+        z-index: 1;
+    }
+    .roadmap-item:nth-child(odd) .roadmap-icon {
+        right: -25px;
+        transform: translateX(50%);
+    }
+    .roadmap-item:nth-child(even) .roadmap-icon {
+        left: -25px;
+        transform: translateX(-50%);
+    }
+    .roadmap-content {
+        background-color: var(--vz-card-bg-custom);
+        padding: 1.5rem;
+        border-radius: .5rem;
+        border: 1px solid var(--vz-border-color);
+    }
+    .roadmap-duration {
+        font-weight: 600;
+        color: var(--vz-primary);
+        margin-bottom: 0.5rem;
+    }
+    .roadmap-title {
+        font-size: 1.2rem;
+        margin-bottom: 0.75rem;
+    }
+    .customization-form {
+        background-color: var(--vz-card-bg);
+        border: 1px solid var(--vz-border-color);
+        border-radius: .5rem;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+    }
+    .form-section {
+        margin-bottom: 1.5rem;
+    }
+    .form-section:last-child {
+        margin-bottom: 0;
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="main-content">
+  <div class="page-content">
+    <div class="container-fluid">
+
+      <div class="row">
+        <div class="col-12">
+          <div class="page-title-box d-sm-flex align-items-center justify-content-between">
+            <h4 class="mb-sm-0">Action Plan Roadmap: {{ action_plan.career.name }}</h4>
+            <div class="page-title-right">
+              <button id="toggleCustomizationBtn" class="btn btn-outline-primary me-2">
+                <i class="ri-settings-3-line align-bottom me-1"></i> Customize
+              </button>
+              <button id="generateRoadmapBtn" class="btn btn-primary">
+                <i class="ri-magic-line align-bottom me-1"></i> Generate AI Roadmap
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Customization Form (Initially Hidden) -->
+      <div class="row" id="customizationSection" style="display: none;">
+        <div class="col-lg-12">
+          <div class="customization-form">
+            <h5 class="mb-3">
+              <i class="ri-user-settings-line me-2"></i>Customize Your Roadmap
+            </h5>
+
+            <div class="row">
+              <div class="col-md-4">
+                <div class="form-section">
+                  <label for="startingAge" class="form-label">Starting Age (Optional)</label>
+                  <input type="number" class="form-control" id="startingAge" placeholder="e.g., 16, 25, 30..." min="10" max="80">
+                  <small class="text-muted">What age would you like to start this career path?</small>
+                </div>
+              </div>
+
+              <div class="col-md-4">
+                <div class="form-section">
+                  <label for="country" class="form-label">Country (Optional)</label>
+                  <input type="text" class="form-control" id="country" placeholder="e.g., United States, Canada, UK...">
+                  <small class="text-muted">Requirements may vary by location</small>
+                </div>
+              </div>
+
+              <div class="col-md-4">
+                <div class="form-section">
+                  <label class="form-label">Special Accommodations</label>
+                  <button type="button" class="btn btn-outline-secondary btn-sm d-block" id="toggleSpecialNeedsBtn">
+                    <i class="ri-add-line me-1"></i> Add Special Needs
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Special Needs Section (Initially Hidden) -->
+            <div id="specialNeedsSection" style="display: none;">
+              <div class="form-section">
+                <label for="specialNeeds" class="form-label">
+                  <i class="ri-heart-line me-1"></i>Special Needs or Accommodations
+                </label>
+                <textarea class="form-control" id="specialNeeds" rows="3"
+                  placeholder="Please describe any special accommodations you need (e.g., visual impairment, hearing impairment, mobility limitations, learning disabilities, etc.). This will help us tailor the roadmap with appropriate resources and alternative pathways."></textarea>
+                <small class="text-muted">This information helps create a more accessible and personalized roadmap for you.</small>
+              </div>
+            </div>
+
+            <div class="text-end">
+              <button id="clearCustomizationBtn" class="btn btn-outline-secondary me-2">
+                <i class="ri-refresh-line me-1"></i> Clear All
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-lg-12">
+          <div class="card">
+            <div class="card-body" id="roadmap-container">
+              {% if action_plan.roadmap_content %}
+                {{ action_plan.roadmap_content|safe }}
+              {% else %}
+                <div id="roadmap-placeholder" class="text-center py-5">
+                  <i class="ri-road-map-line display-4 text-muted"></i>
+                  <h5 class="mt-3">Your Roadmap Awaits</h5>
+                  <p class="text-muted">Click the button above to generate a personalized, step-by-step plan.</p>
+                  <p class="text-muted"><small>Use the "Customize" button to personalize your roadmap with your age, location, and special needs.</small></p>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% include "partials/footer.html" %}
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const generateBtn = document.getElementById('generateRoadmapBtn');
+    const roadmapContainer = document.getElementById('roadmap-container');
+    const toggleCustomizationBtn = document.getElementById('toggleCustomizationBtn');
+    const customizationSection = document.getElementById('customizationSection');
+    const toggleSpecialNeedsBtn = document.getElementById('toggleSpecialNeedsBtn');
+    const specialNeedsSection = document.getElementById('specialNeedsSection');
+    const clearCustomizationBtn = document.getElementById('clearCustomizationBtn');
+
+    const planId = "{{ action_plan.id }}";
+    const csrfToken = "{{ csrf_token }}";
+
+    // Toggle customization form
+    toggleCustomizationBtn.addEventListener('click', function() {
+        if (customizationSection.style.display === 'none') {
+            customizationSection.style.display = 'block';
+            toggleCustomizationBtn.innerHTML = '<i class="ri-close-line me-1"></i> Hide Customization';
+        } else {
+            customizationSection.style.display = 'none';
+            toggleCustomizationBtn.innerHTML = '<i class="ri-settings-3-line me-1"></i> Customize';
+        }
+    });
+
+    // Toggle special needs section
+    toggleSpecialNeedsBtn.addEventListener('click', function() {
+        if (specialNeedsSection.style.display === 'none') {
+            specialNeedsSection.style.display = 'block';
+            toggleSpecialNeedsBtn.innerHTML = '<i class="ri-subtract-line me-1"></i> Remove Special Needs';
+            toggleSpecialNeedsBtn.classList.remove('btn-outline-secondary');
+            toggleSpecialNeedsBtn.classList.add('btn-outline-danger');
+        } else {
+            specialNeedsSection.style.display = 'none';
+            toggleSpecialNeedsBtn.innerHTML = '<i class="ri-add-line me-1"></i> Add Special Needs';
+            toggleSpecialNeedsBtn.classList.remove('btn-outline-danger');
+            toggleSpecialNeedsBtn.classList.add('btn-outline-secondary');
+            document.getElementById('specialNeeds').value = '';
+        }
+    });
+
+    // Clear all customization
+    clearCustomizationBtn.addEventListener('click', function() {
+        document.getElementById('startingAge').value = '';
+        document.getElementById('country').value = '';
+        document.getElementById('specialNeeds').value = '';
+        if (specialNeedsSection.style.display === 'block') {
+            toggleSpecialNeedsBtn.click(); // Hide special needs section
+        }
+    });
+
+    // Generate roadmap with customization
+    generateBtn.addEventListener('click', function() {
+        generateBtn.disabled = true;
+        generateBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Generating...';
+
+        roadmapContainer.innerHTML = '<div class="text-center p-5"><div class="spinner-border text-primary"></div><p class="mt-2">AI is building your personalized roadmap...</p></div>';
+
+        // Collect customization data
+        const customizationData = {
+            starting_age: document.getElementById('startingAge').value,
+            country: document.getElementById('country').value,
+            special_needs: document.getElementById('specialNeeds').value
+        };
+
+        fetch("{% url 'apps:api.generate_roadmap' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify({
+                plan_id: planId,
+                customization: customizationData
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                roadmapContainer.innerHTML = data.roadmap_content;
+            } else {
+                roadmapContainer.innerHTML = `<p class="text-danger text-center p-3">An error occurred: ${data.message || 'Unknown error'}</p>`;
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            roadmapContainer.innerHTML = '<p class="text-danger text-center p-3">A network or script error occurred.</p>';
+        })
+        .finally(() => {
+            generateBtn.disabled = false;
+            generateBtn.innerHTML = '<i class="ri-magic-line me-1"></i> Regenerate AI Roadmap';
+        });
+    });
+});
+</script>
+{% endblock extra_js %}

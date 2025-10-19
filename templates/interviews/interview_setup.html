@@ -1,0 +1,227 @@
+{% extends "partials/base.html" %}
+{% load static %}
+
+{% block title %}AI Mock Interview{% endblock title %}
+
+{% block extra_css %}
+<style>
+    /* Custom styles for the difficulty slider */
+    .difficulty-slider-container {
+        padding: 0 15px;
+    }
+    .slider {
+        -webkit-appearance: none;
+        width: 100%;
+        height: 10px;
+        border-radius: 5px;
+        background: var(--vz-light);
+        outline: none;
+        opacity: 0.7;
+        -webkit-transition: .2s;
+        transition: opacity .2s;
+    }
+    .slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 25px;
+        height: 25px;
+        border-radius: 50%;
+        background: var(--vz-primary);
+        cursor: pointer;
+    }
+    .slider::-moz-range-thumb {
+        width: 25px;
+        height: 25px;
+        border-radius: 50%;
+        background: var(--vz-primary);
+        cursor: pointer;
+    }
+    .difficulty-labels {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.9em;
+        color: var(--vz-gray-600);
+        margin-top: 5px;
+    }
+
+    /* Styles for sample context bubbles */
+    .sample-bubbles {
+        margin-top: 8px;
+    }
+    .bubble {
+        cursor: pointer;
+        display: inline-block;
+        padding: 5px 12px;
+        margin: 4px;
+        border-radius: 20px;
+        background-color: var(--vz-light);
+        border: 1px solid var(--vz-border-color);
+        font-size: 0.85rem;
+        transition: all 0.2s ease;
+    }
+    .bubble:hover {
+        background-color: var(--vz-primary-rgb-01);
+        border-color: var(--vz-primary);
+        color: var(--vz-primary);
+    }
+
+    /* NEW: Style to make cards in the same row equal height */
+    .card-full-height {
+        height: calc(100% - 1.5rem); /* Adjusts for bootstrap's default row gap */
+    }
+    .history-card-body {
+        max-height: 500px; /* Adjust as needed */
+        overflow-y: auto;
+    }
+</style>
+{% endblock extra_css %}
+
+
+{% block content %}
+<div class="main-content">
+    <div class="page-content">
+        <div class="container-fluid">
+            <!-- Page Title -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="page-title-box d-sm-flex align-items-center justify-content-between">
+                        <h4 class="mb-sm-0">AI MOCK INTERVIEW</h4>
+                        <div class="page-title-right">
+                            <ol class="breadcrumb m-0">
+                                <li class="breadcrumb-item"><a href="javascript: void(0);">Cariera</a></li>
+                                <li class="breadcrumb-item active">Interview Practice</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NEW: Two-Column Layout Row -->
+            <div class="row">
+                <!-- Left Column: Interview Setup -->
+                <div class="col-lg-7">
+                    <div class="card card-full-height">
+                        <div class="card-body">
+                            <div class="text-center mb-4">
+                                <i class="ri-mic-line display-3 text-primary"></i>
+                                <h4 class="card-title mt-2">Practice Your Interview Skills</h4>
+                                <p class="text-muted">Set the stage for your interview to get the most relevant questions.</p>
+                            </div>
+
+                            <form action="{% url 'apps:interview.setup' %}" method="POST">
+                                {% csrf_token %}
+
+                                <!-- Context Field -->
+                                <div class="mb-4">
+                                    <label for="context" class="form-label fs-15">Interview Goal or Context</label>
+                                    <textarea class="form-control" name="context" id="context" rows="3" placeholder="e.g., Job interview for a Junior Python Developer at a startup."></textarea>
+                                    <!-- Sample Context Bubbles -->
+                                    <div class="sample-bubbles">
+                                        <small class="text-muted">Samples:</small>
+                                        <span class="bubble" data-context="Job interview for a Software Engineer position.">Software Engineer</span>
+                                        <span class="bubble" data-context="Scholarship interview for a university's computer science program.">Scholarship</span>
+                                        <span class="bubble" data-context="Behavioral interview practice for a project manager role.">Project Manager</span>
+                                        <span class="bubble" data-context="General practice for speaking about myself and my accomplishments.">General Practice</span>
+                                    </div>
+                                </div>
+
+                                <!-- Difficulty Slider -->
+                                <div class="mb-4">
+                                    <label for="difficulty-slider" class="form-label fs-15">Difficulty Level: <span id="difficulty-label" class="fw-bold text-primary">Standard</span></label>
+                                    <div class="difficulty-slider-container">
+                                        <input type="range" min="0" max="2" value="1" class="slider" id="difficulty-slider">
+                                        <div class="difficulty-labels">
+                                            <span>Simple</span>
+                                            <span>Standard</span>
+                                            <span>Hard</span>
+                                        </div>
+                                    </div>
+                                    <input type="hidden" name="difficulty" id="difficulty-input" value="standard">
+                                </div>
+
+                                <!-- Custom Duration -->
+                                <div class="mb-4">
+                                    <label for="duration" class="form-label fs-15">Interview Duration (in minutes)</label>
+                                    <input type="number" class="form-control" name="duration" id="duration" value="3" min="1" max="15">
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100 btn-lg">Start New Interview</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Interview History -->
+                <div class="col-lg-5">
+                     <div class="card card-full-height">
+                         <div class="card-header align-items-center d-flex">
+                             <h5 class="card-title mb-0 flex-grow-1">Interview History</h5>
+                             <div class="flex-shrink-0">
+                                 <!-- Search Form -->
+                                 <form method="GET" action="{% url 'apps:interview.setup' %}" class="d-flex" role="search">
+                                    <input class="form-control me-2 form-control-sm" type="search" placeholder="Search..." name="q" value="{{ search_query|default:'' }}" aria-label="Search">
+                                    <button class="btn btn-soft-primary btn-sm" type="submit"><i class="ri-search-line"></i></button>
+                                 </form>
+                             </div>
+                         </div>
+                         <div class="card-body history-card-body">
+                             <!-- Link to Progress Page -->
+                             <div class="d-grid mb-3">
+                                <a href="{% url 'apps:interview.progress' %}" class="btn btn-soft-success"><i class="ri-line-chart-line align-middle me-1"></i> View Progress Over Time</a>
+                             </div>
+                             <ul class="list-group list-group-flush">
+                                 {% for interview in past_interviews %}
+                                 <li class="list-group-item d-flex justify-content-between align-items-center">
+                                     <span class="text-truncate" style="max-width: 60%;">
+                                        {% if interview.title %}
+                                            {{ interview.title }}
+                                        {% else %}
+                                            Interview on {{ interview.start_time|date:"F d, Y" }}
+                                        {% endif %}
+                                     </span>
+                                     <div class="hstack gap-2">
+                                         <a href="{% url 'apps:interview.result' interview.id %}" class="btn btn-sm btn-soft-info">Results</a>
+                                         <!-- Delete Button/Form -->
+                                         <form action="{% url 'apps:interview.delete' interview.id %}" method="POST" onsubmit="return confirm('Are you sure you want to delete this interview?');">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-sm btn-soft-danger"><i class="ri-delete-bin-line"></i></button>
+                                         </form>
+                                     </div>
+                                 </li>
+                                 {% empty %}
+                                 <li class="list-group-item text-center text-muted">You have no completed interviews.</li>
+                                 {% endfor %}
+                             </ul>
+                         </div>
+                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% include "partials/footer.html" %}
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Difficulty slider logic
+    const slider = document.getElementById('difficulty-slider');
+    const label = document.getElementById('difficulty-label');
+    const hiddenInput = document.getElementById('difficulty-input');
+    const difficultyMap = { '0': 'Simple', '1': 'Standard', '2': 'Hard' };
+    const difficultyValueMap = { '0': 'simple', '1': 'standard', '2': 'hard' };
+    slider.addEventListener('input', function() {
+        label.textContent = difficultyMap[this.value];
+        hiddenInput.value = difficultyValueMap[this.value];
+    });
+
+    // Sample context bubble logic
+    const contextTextarea = document.getElementById('context');
+    document.querySelectorAll('.bubble').forEach(bubble => {
+        bubble.addEventListener('click', function() {
+            contextTextarea.value = this.dataset.context;
+        });
+    });
+});
+</script>
+{% endblock extra_js %}

@@ -1,0 +1,273 @@
+{% extends "partials/base.html" %}
+{% load static %}
+
+{% block title %}AI Interview in Progress{% endblock title %}
+
+{% block extra_css %}
+<style>
+    .interview-container { max-width: 800px; margin: auto; }
+    .status-indicator { font-size: 1.2rem; font-weight: 500; }
+    #transcript-box { height: 400px; background-color: var(--vz-light); border-radius: 8px; overflow-y: auto; padding: 1rem; }
+    
+    #video-container {
+        position: relative;
+        width: 160px;
+        height: 120px;
+        border-radius: 8px;
+        overflow: hidden;
+        border: 2px solid var(--vz-border-color);
+        margin: 0 auto 1rem;
+        display: none;
+        transition: box-shadow 0.3s ease-in-out; /* For the glow effect */
+    }
+    #user-video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+
+    /* NEW: Animation for the camera capture "glow" */
+    @keyframes capture-glow {
+        0% { box-shadow: 0 0 0 0px rgba(0, 123, 255, 0.7); }
+        50% { box-shadow: 0 0 10px 3px rgba(0, 123, 255, 0.7); }
+        100% { box-shadow: 0 0 0 0px rgba(0, 123, 255, 0.7); }
+    }
+    .capture-effect {
+        animation: capture-glow 1s ease-out;
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="main-content">
+    <div class="page-content">
+        <div class="container-fluid">
+            <div class="interview-container">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h4 class="card-title mb-0">Interview in Progress</h4>
+                        <div id="timer" class="fs-5">00:00</div>
+                    </div>
+                    <div class="card-body text-center">
+                        <div class="form-check form-switch form-switch-lg mb-1 d-inline-block">
+                            <input class="form-check-input" type="checkbox" role="switch" id="enable-camera-switch">
+                            <label class="form-check-label" for="enable-camera-switch">Enable Camera Analysis</label>
+                        </div>
+                        <p class="text-muted small mb-3">A snapshot is taken for analysis about every 10 seconds.</p>
+                        
+                        <div id="video-container">
+                            <video id="user-video" autoplay muted playsinline></video>
+                        </div>
+
+                        <div id="status-indicator" class="status-indicator alert alert-info">
+                            <i class="ri-loader-4-line spin"></i> Connecting to session...
+                        </div>
+
+                        <div class="my-4">
+                            <button id="mic-button" class="btn btn-primary btn-lg rounded-circle" style="width: 80px; height: 80px;" disabled>
+                                <i class="ri-mic-off-fill fs-2"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <h5 class="text-start">Transcript</h5>
+                            <div id="transcript-box" class="text-start"></div>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <button id="end-interview-btn" class="btn btn-danger w-100">End Interview Early</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<form id="result-form" action="{% url 'apps:interview.result' session.id %}" method="GET" style="display:none;"></form>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@latest/distrib/browser/microsoft.cognitiveservices.speech.sdk.bundle.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const sessionId = "{{ session.id }}";
+    const speechKey = "{{ azure_speech_key }}";
+    const speechRegion = "{{ azure_speech_region }}";
+    const interviewDurationSeconds = {{ session.duration_minutes }} * 60;
+
+    let speechRecognizer;
+    let synthesizer;
+    let interviewSocket;
+    let timerInterval;
+    let isWaitingForAI = false;
+    let frameCaptureInterval;
+    let interviewEnded = false;
+
+    // ... (DOM element variables are unchanged) ...
+    const statusIndicator = document.getElementById('status-indicator');
+    const micButton = document.getElementById('mic-button');
+    const transcriptBox = document.getElementById('transcript-box');
+    const timerDisplay = document.getElementById('timer');
+    const endInterviewBtn = document.getElementById('end-interview-btn');
+    const cameraSwitch = document.getElementById('enable-camera-switch');
+    const videoContainer = document.getElementById('video-container');
+    const userVideo = document.getElementById('user-video');
+    const csrfToken = '{{ csrf_token }}';
+
+    // ... (Event listeners are unchanged) ...
+    micButton.addEventListener('click', toggleMicrophone);
+    endInterviewBtn.addEventListener('click', endInterview);
+    cameraSwitch.addEventListener('change', handleCameraToggle);
+
+    // Initialize the application
+    initializeWebSocket();
+    if (typeof SpeechSDK !== 'undefined') {
+        initializeSpeechSDK();
+    } else {
+        updateStatus("Error: Audio services failed to load.", "danger");
+    }
+    startTimer();
+    
+    function captureAndAnalyzeFrame() {
+        if (!userVideo.srcObject || userVideo.paused || userVideo.ended || document.hidden) return;
+        
+        // --- NEW: Add the glow effect ---
+        videoContainer.classList.add('capture-effect');
+        // Remove the class after the animation completes
+        setTimeout(() => {
+            videoContainer.classList.remove('capture-effect');
+        }, 1000); // 1s matches the animation duration
+
+        const canvas = document.createElement('canvas');
+        canvas.width = userVideo.videoWidth;
+        canvas.height = userVideo.videoHeight;
+        canvas.getContext('2d').drawImage(userVideo, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(function(blob) {
+            const formData = new FormData();
+            formData.append('session_id', sessionId);
+            formData.append('frame', blob, 'frame.jpg');
+            fetch("{% url 'apps:api.analyze_frame' %}", {
+                method: 'POST',
+                headers: {'X-CSRFToken': csrfToken},
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => console.log('Frame analysis:', data.status))
+            .catch(err => console.error('Error sending frame:', err));
+        }, 'image/jpeg');
+    }
+
+    function speakText(text) {
+        if (interviewEnded) return;
+        updateStatus("AI is speaking...", "warning");
+        if(micButton) micButton.disabled = true;
+
+        // --- THE AUDIO FIX ---
+        // Instead of closing the old synthesizer, we create a new one for each utterance.
+        // This is the recommended pattern from Microsoft to avoid state management issues.
+        const speechConfig = SpeechSDK.SpeechConfig.fromSubscription(speechKey, speechRegion);
+        const localSynthesizer = new SpeechSDK.SpeechSynthesizer(speechConfig);
+
+        localSynthesizer.speakTextAsync(text, result => {
+            if (interviewEnded) { localSynthesizer.close(); return; }
+            if (result.reason === SpeechSDK.ResultReason.SynthesizingAudioCompleted) {
+                updateStatus("Your turn. Click the mic to speak.", "primary");
+                if(micButton) micButton.disabled = false;
+            } else {
+                console.error("Speech synthesis failed:", result.errorDetails);
+                updateStatus("Error: Could not play AI audio.", "danger");
+            }
+            localSynthesizer.close();
+        }, error => {
+            console.error("Speech synthesis error:", error);
+            localSynthesizer.close();
+        });
+    }
+
+    // --- The `endInterview` function is now fully robust ---
+    function endInterview() {
+        if (interviewEnded) return;
+        interviewEnded = true;
+
+        console.log("Ending interview and cleaning up resources...");
+        clearInterval(timerInterval);
+        clearInterval(frameCaptureInterval);
+
+        updateStatus("Interview completed! Analyzing results...", "success");
+        micButton.disabled = true;
+        endInterviewBtn.disabled = true;
+        cameraSwitch.disabled = true;
+
+        if (userVideo.srcObject) userVideo.srcObject.getTracks().forEach(track => track.stop());
+        if (interviewSocket && interviewSocket.readyState === WebSocket.OPEN) interviewSocket.close();
+        
+        // Use a try/catch to safely close SDK objects that might already be disposed
+        try {
+            if (speechRecognizer) {
+                speechRecognizer.stopContinuousRecognitionAsync(() => {
+                    speechRecognizer.close();
+                    speechRecognizer = undefined;
+                });
+            }
+        } catch (e) { console.warn("Could not close speech recognizer:", e); }
+        
+        // This is no longer needed as synthesizer is locally scoped in speakText
+        // try { if (synthesizer) { synthesizer.close(); synthesizer = undefined; } } 
+        // catch (e) { console.warn("Could not close synthesizer:", e); }
+
+        setTimeout(() => document.getElementById('result-form').submit(), 3000);
+    }
+
+    // --- NO CHANGES NEEDED for the functions below ---
+    async function handleCameraToggle() {
+        if (this.checked) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                userVideo.srcObject = stream;
+                videoContainer.style.display = 'block';
+                frameCaptureInterval = setInterval(captureAndAnalyzeFrame, 10000);
+            } catch (err) { console.error("Error accessing camera:", err); alert("Could not access your camera."); this.checked = false; }
+        } else {
+            if (userVideo.srcObject) userVideo.srcObject.getTracks().forEach(track => track.stop());
+            videoContainer.style.display = 'none';
+            clearInterval(frameCaptureInterval);
+        }
+    }
+    function initializeWebSocket() {
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+        const wsUrl = `${wsProtocol}${window.location.host}/ws/interview/${sessionId}/`;
+        interviewSocket = new WebSocket(wsUrl);
+        interviewSocket.onopen = () => updateStatus("Waiting for AI to start...", "info");
+        interviewSocket.onmessage = (e) => {
+            const data = JSON.parse(e.data);
+            if (data.type === 'ai_response' && !interviewEnded) {
+                isWaitingForAI = false;
+                addTranscriptEntry("AI", data.message);
+                speakText(data.message);
+            }
+        };
+        interviewSocket.onclose = () => { if (!interviewEnded) { updateStatus("Connection lost.", "danger"); if(micButton) micButton.disabled = true; } };
+    }
+    function initializeSpeechSDK() {
+        const speechConfig = SpeechSDK.SpeechConfig.fromSubscription(speechKey, speechRegion);
+        speechConfig.speechRecognitionLanguage = "en-US";
+        speechConfig.setProperty(SpeechSDK.PropertyId.SpeechServiceResponse_EndSilenceTimeoutMs, "2500");
+        const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
+        speechRecognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
+        speechRecognizer.recognized = (s, e) => {
+            if (e.result.reason === SpeechSDK.ResultReason.RecognizedSpeech) {
+                const userText = e.result.text;
+                if (userText.trim() && !isWaitingForAI && !interviewEnded) {
+                    isWaitingForAI = true; addTranscriptEntry("You", userText);
+                    interviewSocket.send(JSON.stringify({ type: 'user_speech', message: userText }));
+                    stopListening();
+                }
+            }
+        };
+        speechRecognizer.canceled = (s, e) => { isWaitingForAI = false; stopListening(); };
+        speechRecognizer.sessionStopped = (s, e) => stopListening();
+    }
+    function startListening() { if (speechRecognizer && !interviewEnded) { updateStatus("Listening...", "success"); micButton.innerHTML = `<i class="ri-mic-fill fs-2"></i>`; micButton.classList.replace('btn-primary', 'btn-danger'); speechRecognizer.startContinuousRecognitionAsync(); } }
+    function stopListening() { if (speechRecognizer && !interviewEnded) { updateStatus("Processing...", "info"); micButton.innerHTML = `<i class="ri-mic-off-fill fs-2"></i>`; micButton.classList.replace('btn-danger', 'btn-primary'); micButton.disabled = true; speechRecognizer.stopContinuousRecognitionAsync(); } }
+    function toggleMicrophone() { if (micButton.classList.contains('btn-danger')) stopListening(); else startListening(); }
+    function updateStatus(message, type) { statusIndicator.textContent = message; statusIndicator.className = `status-indicator alert alert-${type}`; }
+    function addTranscriptEntry(speaker, text) { const entry = document.createElement('div'); entry.classList.add('transcript-entry'); entry.innerHTML = `<p class="mb-1"><span class="transcript-speaker ${speaker.toLowerCase()}">${speaker}:</span></p><p class="text-muted ps-2">${text}</p>`; transcriptBox.appendChild(entry); transcriptBox.scrollTop = transcriptBox.scrollHeight; }
+    function startTimer() { let seconds = 0; timerInterval = setInterval(() => { if (interviewEnded) { clearInterval(timerInterval); return; } seconds++; const mins = String(Math.floor(seconds / 60)).padStart(2, '0'); const secs = String(seconds % 60).padStart(2, '0'); timerDisplay.textContent = `${mins}:${secs}`; if (seconds >= interviewDurationSeconds) endInterview(); }, 1000); }
+});
+</script>
+{% endblock extra_js %}
